@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+  overflow: hidden;
+}
+
+/* Running sessions breathe; waiting sessions blink. Motion carries the
+   difference even when the colour is not visible - a glance at the edge of
+   vision still tells them apart. */
+@keyframes hm-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+.hm-breathe {
+  animation: hm-breathe 2.2s ease-in-out infinite;
+}
+
+@keyframes hm-alert {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.hm-alert {
+  animation: hm-alert 1s steps(2, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-breathe,
+  .hm-alert {
+    animation: none;
+  }
+}

@@ -1,0 +1,46 @@
+[package]
+name = "harness-monitor"
+version = "0.1.0"
+description = "Floating monitor for local AI coding agent harnesses"
+authors = ["Arya"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "harness_monitor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# Switches the webview from the dev server to the assets embedded at build
+# time. Without it a release binary still points at devUrl and shows
+# "localhost failed to connect". The tauri CLI passes this automatically;
+# plain `cargo build --release` does not, so our build script must.
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-notification = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dirs = "5"
+rusqlite = { version = "0.32", features = ["bundled"] }
+clap = { version = "4", features = ["derive"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Desktop portal is the only notification path that exists on a stock WSL.
+zbus = { version = "5", default-features = false, features = ["blocking-api", "tokio"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
