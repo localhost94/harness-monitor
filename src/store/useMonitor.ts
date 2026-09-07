@@ -85,6 +85,8 @@ export const useMonitor = create<MonitorState>((set, get) => ({
         );
       } else if (only === "idle") {
         sessions = sessions.map((s) => ({ ...s, state: "idle" as const, waiting_for: null }));
+      } else if (only === "input") {
+        sessions = sessions.filter((s) => s.state !== "awaiting-permission");
       } else if (only === "none") {
         sessions = [];
       }

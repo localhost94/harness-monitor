@@ -19,5 +19,4 @@ if (previewWidth || previewHeight) {
   const root = document.getElementById("root") as HTMLElement;
   if (previewWidth) root.style.width = `${previewWidth}px`;
   if (previewHeight) root.style.height = `${previewHeight}px`;
-  root.style.outline = "1px dashed rgba(255,0,0,.4)";
 }

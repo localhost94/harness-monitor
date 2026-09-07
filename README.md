@@ -12,10 +12,13 @@ time, shows which sessions are running, idle or blocked on you, and how much of
 the Claude 5-hour plan window is gone. Everything is read from files those tools
 already write on your own machine: no backend, no network calls, no API keys.
 
-![The collapsed pill](docs/pill.png)
+![The pill moving through waiting, running and idle states](docs/demo.gif)
 
-Click through and it expands into the session list; the arrow on each row jumps
-straight to the terminal pane running that session.
+The surface never changes colour with state - only the accents do: the rail
+down the left edge, the glyph and its motion, and a ring around the whole pill
+when something is waiting on you. Click the list icon and it expands into the
+session list, where the arrow on each row jumps straight to the terminal pane
+running that session.
 
 | Expanded, light | Expanded, dark | Vertical strip |
 |---|---|---|
@@ -245,6 +248,25 @@ That produces `dist-windows/harness-monitor.exe` plus
 `dist-windows/harness-monitor-agent`, the Linux binary the exe launches through
 `wsl.exe`. Keep them side by side, or point at the agent with `HM_AGENT_PATH`;
 the distro comes from `HM_WSL_DISTRO`, else the first entry of `wsl.exe -l -q`.
+
+## Why not one of the others
+
+Several tools now watch AI coding sessions, and they are solving a different
+shape of the problem:
+
+| | Shape | Where it runs |
+|---|---|---|
+| **HarnessMonitor** | A floating pill or strip that interrupts you when a session finishes or blocks, and otherwise stays out of the way | Windows + WSL2, or Linux |
+| [agentpulse](https://github.com/jstuart0/agentpulse) | A full dashboard with prompts, responses and session history | Browser |
+| [AgentBar](https://github.com/scari/AgentBar) | Menu-bar usage tracking | macOS |
+| [agent-deck](https://github.com/asheshgoplani/agent-deck) | A TUI session manager - launch and switch sessions | Terminal |
+| [AgentDeck](https://github.com/puritysb/AgentDeck) | A physical control surface, one key per session | Stream Deck and friends |
+
+Pick this one if you want to be told rather than to watch, if you are on
+Windows with your agents inside WSL, or if you want five harnesses in one place
+with honest labelling of how much each one actually reports. Pick a dashboard
+if you want to read transcripts, or the TUI if you want to drive sessions from
+one place.
 
 ## Documentation
 
