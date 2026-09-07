@@ -1,0 +1,47 @@
+name: Harness support
+description: Ask for another AI coding agent to be tracked
+labels: [harness]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Support depends entirely on what the harness writes to disk. Answering
+        the questions below is most of the work of adding it - see
+        [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) for the adapter contract.
+
+  - type: input
+    id: name
+    attributes:
+      label: Which harness
+    validations:
+      required: true
+
+  - type: textarea
+    id: paths
+    attributes:
+      label: Where does it keep state?
+      placeholder: |
+        e.g. ~/.config/<tool>/sessions/*.json, or a SQLite file, or nothing at all
+    validations:
+      required: true
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: Does it record a session status anywhere?
+      description: |
+        This decides the fidelity tier. If nothing on disk says whether a turn
+        is finished, the honest answer is presence-only - the app will not
+        invent a state it cannot verify.
+      options:
+        - "Yes - there is an explicit status field"
+        - "No - only timestamps or file mtimes"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: usage
+    attributes:
+      label: Does it record token or cost usage?
+      render: json

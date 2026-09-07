@@ -1,0 +1,61 @@
+name: Bug report
+description: Something is reported wrong, missing, or misleading
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The most useful bug reports for this app answer one question: **what
+        did the app claim, and what was actually true?** A wrong state is worse
+        than a crash here, because it fires a wrong notification.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What the app showed, and what was actually happening
+      placeholder: |
+        The pill said "2 running" but only one session was working; the other
+        had finished about ten minutes earlier.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build
+    attributes:
+      label: Build
+      options:
+        - Windows ARM64 (release .exe)
+        - Windows x64 (built from source)
+        - Linux / WSLg (built from source)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: harness
+    attributes:
+      label: Harness and version
+      placeholder: Claude Code 2.1.261 / opencode / codex / gemini-cli / antigravity
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        Run with `HM_LOG_FILE` set to a writable path and `RUST_LOG=harness_monitor_lib=debug`,
+        then paste the relevant lines. The Windows release build has no console,
+        so this is usually the only way to see what happened.
+      render: text
+
+  - type: textarea
+    id: source
+    attributes:
+      label: Source data, if you can share it
+      description: |
+        For a wrong Claude Code state, the matching `~/.claude/sessions/<pid>.json`
+        is the single most useful attachment. Redact paths you would rather not
+        publish - the fields that matter are `status`, `waitingFor`, `procStart`,
+        `statusUpdatedAt` and `pidDomain`.
+      render: json

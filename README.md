@@ -1,5 +1,9 @@
 # HarnessMonitor
 
+[![ci](https://github.com/localhost94/harness-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/localhost94/harness-monitor/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/localhost94/harness-monitor)](https://github.com/localhost94/harness-monitor/releases/latest)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A floating widget that tells you the moment an AI coding agent stops working
 and starts waiting for you.
 
@@ -236,6 +240,16 @@ That produces `dist-windows/harness-monitor.exe` plus
 `dist-windows/harness-monitor-agent`, the Linux binary the exe launches through
 `wsl.exe`. Keep them side by side, or point at the agent with `HM_AGENT_PATH`;
 the distro comes from `HM_WSL_DISTRO`, else the first entry of `wsl.exe -l -q`.
+
+## Documentation
+
+| Document | What is in it |
+|---|---|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Why the Windows build talks to WSL, why there is no filesystem watcher, the differ's rules and what each one prevents |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | The adapter contract, and the rules a new harness has to keep |
+| [CHANGELOG.md](CHANGELOG.md) | Releases, and the limitations shipped with each |
+| [SECURITY.md](SECURITY.md) | What counts as a vulnerability here, and how to report it privately |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Contributor Covenant 2.1 |
 
 ## Known limits
 

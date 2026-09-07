@@ -1,0 +1,47 @@
+# Changelog
+
+Notable changes to HarnessMonitor. Format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-09-07
+
+First public build.
+
+### Added
+
+- Tracks Claude Code, opencode, codex, gemini-cli and antigravity at once,
+  reading only what those tools already write to disk. No backend, no network
+  calls, no API keys.
+- Reports each session as running, idle, waiting for input, or waiting for a
+  permission decision, and notifies on exactly two transitions: a turn
+  finishing, and a session starting to wait.
+- Per-harness fidelity is labelled in the UI rather than averaged, so an
+  inferred state is never presented as a reported one.
+- Claude plan window (5-hour) shown as a ring, mirrored from the harness and
+  never derived from token counts. Two sources are reconciled by recency: the
+  statusline shim in `installer/`, and a `Stop` hook's analytics JSONL.
+- Jump to the terminal pane running a session, via herdr when it is present.
+- Floating pill (440x80) or vertical strip (118x300), light or dark, always on
+  top, position remembered across restarts.
+- Windows builds run the adapters inside WSL through the same binary in
+  `--agent` mode; Linux/WSLg runs them in-process.
+- Desktop notifications through the OS on Windows, and through the xdg desktop
+  portal on Linux, where a stock WSL has no notification daemon.
+
+### Known limitations
+
+- The published `.exe` is Windows ARM64. x64 users must build from source until
+  the release workflow's x64 artifact lands.
+- Plan-quota figures come from a live Claude Code process, so they freeze - and
+  grey out with their age - when no session is running.
+- opencode permission prompts are deliberately not detected: the only trace is
+  a log line with no session id and no matching resolution event, so anything
+  latched from it would never unlatch.
+- antigravity is presence-only. Its conversations are binary protobuf with no
+  published schema, so no state is claimed for it.
+
+[Unreleased]: https://github.com/localhost94/harness-monitor/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/localhost94/harness-monitor/releases/tag/v0.1.0
