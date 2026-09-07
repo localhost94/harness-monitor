@@ -6,6 +6,27 @@ Notable changes to HarnessMonitor. Format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-07
+
+### Added
+
+- **Windows x64 binary**, built in CI and attached to the release. Until now the
+  only published build was ARM64, so most Windows users had to compile Tauri
+  themselves.
+- Release workflow that builds the Windows x64 app and the Linux agent on tag,
+  so both halves of a working install ship together every time.
+
+### Documentation
+
+- `docs/ARCHITECTURE.md`, `SECURITY.md`, `CHANGELOG.md`, Contributor Covenant,
+  issue and PR templates, dependabot.
+
+### Fixed
+
+- CI: pinned bun to the version that wrote `bun.lock`; a newer bun rewrites the
+  lockfile format, which made `--frozen-lockfile` fail on a lockfile that was
+  in fact in sync.
+
 ## [0.1.0] - 2026-09-07
 
 First public build.
@@ -43,5 +64,6 @@ First public build.
 - antigravity is presence-only. Its conversations are binary protobuf with no
   published schema, so no state is claimed for it.
 
-[Unreleased]: https://github.com/localhost94/harness-monitor/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/localhost94/harness-monitor/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/localhost94/harness-monitor/releases/tag/v0.1.1
 [0.1.0]: https://github.com/localhost94/harness-monitor/releases/tag/v0.1.0

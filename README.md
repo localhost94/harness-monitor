@@ -23,10 +23,15 @@ straight to the terminal pane running that session.
 
 ## Install
 
-Grab `harness-monitor.exe` **and** `harness-monitor-agent` from the
+Grab the `.exe` for your architecture **and** `harness-monitor-agent` from the
 [latest release](../../releases/latest), keep them in the same folder, and run
-the `.exe`. Windows 10/11 with WSL2; the agent binary is Linux and the app
-launches it inside WSL for you.
+the `.exe`:
+
+- `harness-monitor-x64.exe` — Intel/AMD, which is most machines
+- `harness-monitor-arm64.exe` — Snapdragon and other ARM64 Windows
+- `harness-monitor-agent` — the Linux half; the app launches it inside WSL for you
+
+Windows 10/11 with WSL2 installed.
 
 On Linux/WSLg, build from source (see below) and run the binary directly.
 
