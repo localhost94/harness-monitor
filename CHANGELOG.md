@@ -13,8 +13,10 @@ Notable changes to HarnessMonitor. Format follows
 - **Windows x64 binary**, built in CI and attached to the release. Until now the
   only published build was ARM64, so most Windows users had to compile Tauri
   themselves.
-- Release workflow that builds the Windows x64 app and the Linux agent on tag,
-  so both halves of a working install ship together every time.
+- Release workflow that builds the Windows x64 app and both Linux agents
+  (x86_64 and aarch64) on tag, so a working pair ships for either architecture.
+  The agent runs inside WSL, so it has to match the machine: an x86_64 agent
+  cannot run on an ARM64 machine's WSL.
 
 ### Documentation
 

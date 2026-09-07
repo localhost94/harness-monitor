@@ -30,9 +30,15 @@ Grab the `.exe` for your architecture **and** `harness-monitor-agent` from the
 [latest release](../../releases/latest), keep them in the same folder, and run
 the `.exe`:
 
-- `harness-monitor-x64.exe` — Intel/AMD, which is most machines
-- `harness-monitor-arm64.exe` — Snapdragon and other ARM64 Windows
-- `harness-monitor-agent` — the Linux half; the app launches it inside WSL for you
+| Your Windows | Take these two |
+|---|---|
+| Intel / AMD (most machines) | `harness-monitor-x64.exe` + `harness-monitor-agent-x64` |
+| Snapdragon / ARM64 | `harness-monitor-arm64.exe` + `harness-monitor-agent-arm64` |
+
+Rename the agent to `harness-monitor-agent` (or point at it with
+`HM_AGENT_PATH`) and keep it beside the `.exe`. The two must match your
+architecture: the app launches the agent **inside WSL**, so an x86_64 agent
+will not run on an ARM64 machine's WSL, and vice versa.
 
 Windows 10/11 with WSL2 installed.
 
