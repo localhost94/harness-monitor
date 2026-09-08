@@ -33,6 +33,16 @@ newline-delimited JSON snapshots from its stdout. The adapters run natively in
 Linux, where pids mean something and the database is local. On Linux/WSLg the
 same adapters run in-process and the agent role is unused.
 
+macOS sits on the Linux side of that split. `spawn_source` dispatches on
+`cfg!(windows)`, so a mac build reads `~/.claude`, `~/.codex` and the rest
+in-process and ships as one self-contained `.app` - there is no agent half to
+download. The one thing it does not inherit is reason 1 above: liveness is a
+`/proc/<pid>/stat` read, macOS has no procfs, and `liveness::check` therefore
+returns `Unknown` for every pid. Ghost sessions survive the filter on macOS
+until someone implements the `sysctl(KERN_PROC_PID)` equivalent - which first
+requires knowing what Claude Code writes into `procStart` there, since the
+Linux value is kernel ticks since boot and cannot be it.
+
 ## Snapshots, not streams
 
 `HarnessAdapter::scan()` returns every session it can currently see. There is

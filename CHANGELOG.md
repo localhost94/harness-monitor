@@ -8,6 +8,13 @@ Notable changes to HarnessMonitor. Format follows
 
 ### Added
 
+- **An experimental macOS build**, shipped as one universal (Apple Silicon +
+  Intel) `.dmg`. macOS needs no agent half - the adapters run in-process the way
+  they do on Linux - and the app registers as a tray-only accessory, so it keeps
+  no Dock icon. The build is unsigned, so Gatekeeper blocks the first launch,
+  and dead sessions are not filtered there yet; both are documented in the
+  README.
+
 - **Per-session usage for every harness that reports it**, on each row and
   totalled per harness: tokens everywhere, plus cost where the harness knows it.
   Claude Code's token figures are new - its state file has none, so the adapter

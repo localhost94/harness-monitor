@@ -26,6 +26,8 @@ running that session.
 
 ## Install
 
+### Windows
+
 Grab the `.exe` for your architecture **and** `harness-monitor-agent` from the
 [latest release](../../releases/latest), keep them in the same folder, and run
 the `.exe`:
@@ -42,7 +44,27 @@ will not run on an ARM64 machine's WSL, and vice versa.
 
 Windows 10/11 with WSL2 installed.
 
-On Linux/WSLg, build from source (see below) and run the binary directly.
+### macOS (experimental)
+
+Take `HarnessMonitor-universal.dmg` from the same release - one file, no agent
+half. macOS runs the adapters in-process the way Linux does, so there is
+nothing to pair it with and nothing to arch-match; the dmg is universal. Drag
+the app into `/Applications`.
+
+The build is **unsigned** - there is no Apple Developer Program behind this
+project - so Gatekeeper refuses the first launch. Either right-click the app
+and pick *Open*, or clear the quarantine flag once:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/HarnessMonitor.app
+```
+
+Experimental for two reasons: no release is smoke-tested on a Mac, and dead
+sessions are not filtered there. See [Known limits](#known-limits).
+
+### Linux
+
+Build from source (see below) and run the binary directly.
 
 ## Why it reads what it reads
 
@@ -237,15 +259,79 @@ detected: the only record is a log line with no session id and no matching
 
 ## Build and run
 
+Everywhere: [bun](https://bun.sh) 1.3.12+ and a stable Rust toolchain (1.77 or
+newer, per `src-tauri/Cargo.toml`). The frontend is built once, then the Rust
+side embeds it.
+
 ```bash
 bun install
 bun run build
 
 cd src-tauri
 cargo test                 # 28 tests, no GUI needed
-cargo run                  # Linux/WSLg
+cargo run                  # runs the app against your real sessions
 cargo run -- --agent       # NDJSON snapshots on stdout
 ```
+
+`cargo run` works on Linux/WSLg and macOS. On Windows the app expects to drive
+an agent inside WSL, so use the script further down instead.
+
+A release build needs `--features custom-protocol`; without it the webview
+loads `devUrl` instead of the embedded assets and the app opens on "localhost
+failed to connect". The `tauri` CLI passes that feature for you, plain `cargo`
+does not, and the failure only shows up in a shipped build. If you ever see
+that error, check the log for `frontend connected` - its absence is the tell.
+
+### Linux
+
+```bash
+sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev \
+  libjavascriptcoregtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
+
+bun x tauri build --bundles deb,appimage
+```
+
+The webview stack is needed even for `cargo test`, because the crate links
+against it.
+
+### macOS
+
+```bash
+xcode-select --install     # rusqlite is vendored, so a C compiler is required
+
+bun x tauri build --bundles dmg
+bun x tauri build --target universal-apple-darwin --bundles dmg   # both arches
+```
+
+Unsigned output is fine locally, but Apple Silicon will not launch a binary
+carrying no signature at all - set `APPLE_SIGNING_IDENTITY=-` to have Tauri
+ad-hoc sign it, which is what CI does.
+
+Two macOS notes that bite during development: desktop notifications only work
+from the bundled `.app` (an unbundled `cargo run` has no registered bundle id,
+so toasts silently do nothing), and state lands in
+`~/.local/state/harness-monitor`, not `~/Library/Application Support`.
+
+### Windows
+
+Needs the MSVC build tools and the WebView2 runtime. Native build:
+
+```bash
+bun x tauri build --bundles nsis
+```
+
+Windows ARM cross-compiled from WSL, shipping both halves:
+
+```bash
+./scripts/build-windows.sh
+```
+
+That produces `dist-windows/harness-monitor.exe` plus
+`dist-windows/harness-monitor-agent`, the Linux binary the exe launches through
+`wsl.exe`. Keep them side by side, or point at the agent with `HM_AGENT_PATH`;
+the distro comes from `HM_WSL_DISTRO`, else the first entry of `wsl.exe -l -q`.
+
+### Previewing the UI
 
 To review the UI without a desktop (or to check both themes at once):
 
@@ -262,24 +348,6 @@ otherwise be a crop of a 512px layout. Append `?theme=dark`, `?collapsed`, or
 data covering every state, since real sessions are rarely all interesting at
 once.
 
-Windows ARM build (cross-compiled from WSL, ships both halves):
-
-```bash
-./scripts/build-windows.sh
-```
-
-Use the script, not a bare `cargo build --release`. A release binary needs
-`--features custom-protocol`; without it the webview loads `devUrl` instead of
-the embedded assets and the app opens on "localhost failed to connect". The
-`tauri` CLI passes that feature for you, plain `cargo` does not, and the
-failure only shows up in a shipped build. If you ever see that error, check
-the log for `frontend connected` - its absence is the tell.
-
-That produces `dist-windows/harness-monitor.exe` plus
-`dist-windows/harness-monitor-agent`, the Linux binary the exe launches through
-`wsl.exe`. Keep them side by side, or point at the agent with `HM_AGENT_PATH`;
-the distro comes from `HM_WSL_DISTRO`, else the first entry of `wsl.exe -l -q`.
-
 ## Why not one of the others
 
 Several tools now watch AI coding sessions, and they are solving a different
@@ -287,7 +355,7 @@ shape of the problem:
 
 | | Shape | Where it runs |
 |---|---|---|
-| **HarnessMonitor** | A floating pill or strip that interrupts you when a session finishes or blocks, and otherwise stays out of the way | Windows + WSL2, or Linux |
+| **HarnessMonitor** | A floating pill or strip that interrupts you when a session finishes or blocks, and otherwise stays out of the way | Windows + WSL2, Linux, or macOS (experimental) |
 | [agentpulse](https://github.com/jstuart0/agentpulse) | A full dashboard with prompts, responses and session history | Browser |
 | [AgentBar](https://github.com/scari/AgentBar) | Menu-bar usage tracking | macOS |
 | [agent-deck](https://github.com/asheshgoplani/agent-deck) | A TUI session manager - launch and switch sessions | Terminal |
@@ -330,6 +398,17 @@ one place.
   problem.
 - Always-on-top under WSLg is best-effort - WSLg composites X/Wayland windows
   into the Windows desktop and does not reliably honour the hint.
+- **On macOS, dead sessions are not filtered.** Liveness is a `procStart`
+  comparison against `/proc/<pid>/stat`, which macOS does not have, so every
+  pid comes back `Unknown` and stale `~/.claude/sessions` files - ones frozen
+  in `status:"busy"` months ago - still show in the pill. Fixing it needs a
+  `sysctl(KERN_PROC_PID)` implementation plus knowledge of what Claude Code
+  writes into `procStart` on macOS; until then the app keeps ghosts rather than
+  risk dropping live sessions.
+- **Antigravity is unavailable on macOS.** Its root is found by scanning
+  `/mnt/c/Users` for a Windows home, which only exists under WSL.
+- macOS builds are unsigned and not smoke-tested per release. Gatekeeper blocks
+  the first launch until you clear the quarantine flag (see Install).
 - Quota is Claude-only. Other harnesses have their own independent limits, so
   a single blended "usage" number across harnesses would be fiction; their
   cost is shown separately.

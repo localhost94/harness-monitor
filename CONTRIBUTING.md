@@ -31,9 +31,15 @@ Rules that exist for a reason, please keep them:
 bun install
 bun run build
 cd src-tauri && cargo test        # no GUI needed
-cargo run                          # Linux/WSLg
+cargo run                          # Linux/WSLg and macOS
 cargo run -- --agent               # NDJSON snapshots on stdout
 ```
+
+Per-OS prerequisites, and how to produce an installer for each, are in the
+README's [Build and run](README.md#build-and-run) section. Short version:
+Linux needs the webkit2gtk dev packages, macOS needs the Xcode command line
+tools, Windows needs MSVC plus WebView2 and is built through
+`scripts/build-windows.sh` because it ships a Linux agent alongside the exe.
 
 `./scripts/preview.sh 440 620 preview.png` screenshots the UI through headless
 Chrome with fixture data - the fastest way to review a visual change, and the
