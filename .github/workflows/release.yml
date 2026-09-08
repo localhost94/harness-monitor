@@ -37,7 +37,7 @@ jobs:
         run: |
           mkdir -p out
           cp src-tauri/target/x86_64-pc-windows-msvc/release/harness-monitor.exe out/harness-monitor-x64.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-x64
           path: out/harness-monitor-x64.exe
@@ -78,7 +78,7 @@ jobs:
         run: |
           mkdir -p out
           cp src-tauri/target/release/harness-monitor out/harness-monitor-agent-${{ matrix.arch }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-agent-${{ matrix.arch }}
           path: out/harness-monitor-agent-${{ matrix.arch }}
@@ -118,7 +118,7 @@ jobs:
           mkdir -p out
           cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg \
             out/HarnessMonitor-universal.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-universal
           path: out/HarnessMonitor-universal.dmg
