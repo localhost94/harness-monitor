@@ -132,7 +132,7 @@ jobs:
         with:
           path: dist
       - name: Attach binaries to the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/windows-x64/harness-monitor-x64.exe
