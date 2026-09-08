@@ -90,6 +90,16 @@ export const useMonitor = create<MonitorState>((set, get) => ({
       } else if (only === "none") {
         sessions = [];
       }
+      const many = Number(params.get("many") || 0);
+      if (many > 1) {
+        sessions = Array.from({ length: many }, (_, copy) =>
+          sessions.map((s) => ({
+            ...s,
+            key: { ...s.key, pid: s.key.pid + copy * 1000 },
+            name: copy === 0 ? s.name : `${s.name} ${copy + 1}`,
+          })),
+        ).flat();
+      }
       set({
         snapshot: { ...MOCK_SNAPSHOT, sessions },
         receivedAt: Date.now(),

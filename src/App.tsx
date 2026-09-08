@@ -37,7 +37,10 @@ export default function App() {
       </div>
       {expanded && (
         <div
-          className={`relative mt-1 flex-1 overflow-hidden rounded-[20px] border pt-2 backdrop-blur-xl ${PANEL}`}
+          // min-h-0 plus a flex column is what makes the list inside able to
+          // scroll: without a bounded height, overflow-y-auto never engages
+          // and long lists were simply clipped.
+          className={`relative mt-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border pt-2 backdrop-blur-xl ${PANEL}`}
         >
           {/* Same hairline gloss as the pill, so panel and pill read as one object. */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-white/60 to-transparent dark:from-white/12" />

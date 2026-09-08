@@ -46,11 +46,17 @@ export function SessionList() {
     byHarness.set(session.key.harness, [...(byHarness.get(session.key.harness) ?? []), session]);
   }
 
+  // With a dozen sessions the list scrolls, so what needs you has to be near
+  // the top rather than wherever its harness happens to sort.
+  const groups = [...byHarness.entries()].sort(
+    ([, a], [, b]) => rank(b) - rank(a) || b.length - a.length,
+  );
+
   return (
-    <div className="flex flex-col gap-3 overflow-y-auto px-3 pb-3">
-      {[...byHarness.entries()].map(([harness, sessions]) => (
+    <div className="hm-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-3">
+      {groups.map(([harness, sessions]) => (
         <section key={harness} className="flex flex-col gap-1">
-          <h2 className="flex items-center gap-1.5 px-1 text-[10px] font-medium uppercase tracking-wide">
+          <h2 className="sticky top-0 z-10 -mx-1 flex items-center gap-1.5 bg-[#EEF1FE]/95 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide backdrop-blur dark:bg-[#1D2138]/95">
             <span
               className={`rounded px-1 py-px text-[9px] ring-1 ring-inset ${HARNESS_CHIP[harness]}`}
             >
@@ -63,7 +69,12 @@ export function SessionList() {
             <p className="px-1 text-[11px] text-zinc-400 dark:text-zinc-600">no live sessions</p>
           ) : (
             sessions
-              .sort((a, b) => b.state_changed_at - a.state_changed_at)
+              .sort(
+                (a, b) =>
+                  Number(b.state.startsWith("awaiting")) -
+                    Number(a.state.startsWith("awaiting")) ||
+                  b.state_changed_at - a.state_changed_at,
+              )
               .map((session) => <Row key={rowKey(session)} session={session} now={now} />)
           )}
         </section>
@@ -76,6 +87,17 @@ export function SessionList() {
       )}
     </div>
   );
+}
+
+/** Groups with sessions waiting on the user sort first, then busier groups. */
+function rank(sessions: AgentSession[]): number {
+  let score = 0;
+  for (const s of sessions) {
+    if (s.state === "awaiting-permission") score += 100;
+    else if (s.state === "awaiting-input") score += 90;
+    else if (s.state === "running" || s.state === "active-unknown") score += 10;
+  }
+  return score;
 }
 
 /** Identity is the process: sessionId repeats across pids when resumed. */

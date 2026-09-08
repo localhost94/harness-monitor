@@ -57,3 +57,39 @@ body {
     animation: none;
   }
 }
+
+/* A thin, theme-aware scrollbar: the platform default is a wide grey slab
+   that looks pasted onto a 440px floating panel. */
+.hm-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(79, 70, 229, 0.35) transparent;
+}
+
+.hm-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+
+.hm-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hm-scroll::-webkit-scrollbar-thumb {
+  background: rgba(79, 70, 229, 0.32);
+  border-radius: 99px;
+}
+
+.hm-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(79, 70, 229, 0.5);
+}
+
+.dark .hm-scroll {
+  scrollbar-color: rgba(165, 180, 252, 0.32) transparent;
+}
+
+.dark .hm-scroll::-webkit-scrollbar-thumb {
+  background: rgba(165, 180, 252, 0.28);
+}
+
+.dark .hm-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(165, 180, 252, 0.45);
+}

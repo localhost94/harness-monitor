@@ -131,6 +131,11 @@ AG fuchsia (antigravity) - kept outside the state palette so the two never read
 as the same signal. A harness that is installed but quiet shows dimmed with a
 `0`; one that is not installed is absent entirely.
 
+When there are more sessions than fit, the list scrolls: harness headers stick
+to the top so you always know which group you are reading, and anything waiting
+on you sorts first - both between harnesses and inside each one - so a dozen
+running sessions cannot push a blocked one below the fold.
+
 **Two orientations.** The horizontal pill (440x80) suits the bottom of a
 screen; the vertical strip (118x300) is for parking down a side, and stacks the
 same information - rail across the top, the headline, the quota ring labelled
