@@ -105,8 +105,10 @@ other two. After a divider come the per-harness counts; harnesses that are
 installed but idle collapse into a `+N` chip that still names them on hover.
 
 On the right sit **both Claude plan windows** - 5-hour and 7-day - each as a
-ring with the percentage inside and, under the label, the wall-clock time it
-resets (`↻ 12:22`, or `↻ Thu 23:45` when the reset is days out). A countdown
+ring paired with its figure - `5h 64%` on one line, the wall-clock reset time
+under it (`↻ 12:22`, or `↻ Fri 00:05` when the reset is days out). The
+percentage sits in the label rather than inside the ring, where `64%` cannot be
+drawn legibly at 30px and a bare `64` reads as a count. A countdown
 answers "how long"; a clock answers "when can I start again", which is the
 thing you plan around. Hovering gives both, plus which source the reading came
 from.

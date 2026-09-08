@@ -144,12 +144,14 @@ function Window({
             strokeDasharray={`${(circumference * pct) / 100} ${circumference}`}
           />
         </svg>
-        <span className={`text-[9px] font-bold leading-none tabular-nums ${tone.title}`}>
-          {pct.toFixed(0)}
-        </span>
       </div>
       <div className="flex flex-col leading-tight">
-        <span className={`text-[9px] font-semibold ${tone.title}`}>{label}</span>
+        {/* The figure sits in the label, not inside the ring: "52%" does not
+            fit in a 30px ring at a legible size, and a bare "52" reads as a
+            count rather than a percentage. The ring carries the proportion. */}
+        <span className={`whitespace-nowrap text-[9px] font-semibold tabular-nums ${tone.title}`}>
+          {label} {pct.toFixed(0)}%
+        </span>
         {resetsAt && (
           <span className={`whitespace-nowrap text-[9px] tabular-nums ${tone.sub}`}>
             ↻ {resetsAt}
