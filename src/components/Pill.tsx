@@ -2,7 +2,7 @@ import { modeOf, surfaceFor } from "../lib/theme";
 import { useMonitor } from "../store/useMonitor";
 import { DragGrip } from "./DragGrip";
 import { HarnessChips } from "./HarnessChips";
-import { Quota } from "./Quota";
+import { UsagePager } from "./UsagePager";
 import { StatStrip } from "./StatStrip";
 import { Glyph } from "./StateBadge";
 
@@ -123,7 +123,7 @@ export function Pill() {
               {headline}
             </span>
           </div>
-          <Quota quota={snapshot?.quota ?? null} now={now} tone={surface} stack pending={!snapshot} />
+          <UsagePager snapshot={snapshot} now={now} tone={surface} stack />
         </div>
 
         <StatStrip sessions={sessions} vertical />
@@ -175,7 +175,7 @@ export function Pill() {
         </div>
       </div>
 
-      <Quota quota={snapshot?.quota ?? null} now={now} tone={surface} stack pending={!snapshot} />
+      <UsagePager snapshot={snapshot} now={now} tone={surface} stack />
 
       {/* Four icons in 2x2: a single column would not fit 80px of height. */}
       <div className="grid grid-cols-2 gap-px">{controls}</div>

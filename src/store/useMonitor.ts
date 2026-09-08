@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { MOCK_SNAPSHOT } from "../lib/mock";
-import type { Snapshot } from "../types";
+import type { HarnessId, Snapshot } from "../types";
 
 type Theme = "light" | "dark";
 type Orientation = "horizontal" | "vertical";
@@ -13,6 +13,9 @@ interface MonitorState {
   toggleTheme: () => void;
   orientation: Orientation;
   toggleOrientation: () => Promise<void>;
+  /** Which harness the pill's usage pager is showing. */
+  usageHarness: HarnessId;
+  cycleUsage: (delta: number, available: HarnessId[]) => void;
   /** Last action error, shown briefly in the panel footer. */
   error: string | null;
   focusSession: (target: string) => Promise<void>;
@@ -49,6 +52,18 @@ function readTheme(): Theme {
   }
 }
 
+/** Claude Code by default: it is the only harness with a plan window. */
+function readUsageHarness(): HarnessId {
+  const override = new URLSearchParams(location.search).get("usage");
+  if (override) return override as HarnessId;
+  try {
+    const stored = localStorage.getItem("hm.usageHarness");
+    return (stored as HarnessId) || "claude-code";
+  } catch {
+    return "claude-code";
+  }
+}
+
 function readOrientation(): Orientation {
   const override = new URLSearchParams(location.search).get("orientation");
   if (override === "vertical" || override === "horizontal") return override;
@@ -63,6 +78,7 @@ export const useMonitor = create<MonitorState>((set, get) => ({
   snapshot: null,
   theme: readTheme(),
   orientation: readOrientation(),
+  usageHarness: readUsageHarness(),
   error: null,
   receivedAt: null,
   startedAt: Date.now(),
@@ -134,6 +150,20 @@ export const useMonitor = create<MonitorState>((set, get) => ({
       // Private mode or blocked storage: the choice just won't survive a restart.
     }
     set({ theme });
+  },
+
+  cycleUsage: (delta: number, available: HarnessId[]) => {
+    if (available.length === 0) return;
+    const current = available.indexOf(get().usageHarness);
+    // A harness that has since disappeared leaves index -1; stepping from
+    // there lands on the first entry, which is what you want.
+    const next = available[(current + delta + available.length) % available.length];
+    try {
+      localStorage.setItem("hm.usageHarness", next);
+    } catch {
+      // Private mode: the choice just won't survive a restart.
+    }
+    set({ usageHarness: next });
   },
 
   focusSession: async (target: string) => {

@@ -132,8 +132,10 @@ no per-session price to report). Harness headers total their group. Claude
 Code's figures come from tailing the session transcript, so they are a running
 total from when the app first saw that session.
 
-On the right sit **both Claude plan windows** - 5-hour and 7-day - each as a
-ring paired with its figure - `5h 64%` on one line, the wall-clock reset time
+On the right sits the **usage pager**: `‹ CC ›` steps through the detected
+harnesses, and the choice is remembered. Claude Code is the default because it
+is the only one with a plan window - its page shows **both windows**, 5-hour and
+7-day, each as a ring paired with its figure - `5h 64%` on one line, the wall-clock reset time
 under it (`↻ 12:22`, or `↻ Fri 00:05` when the reset is days out). The
 percentage sits in the label rather than inside the ring, where `64%` cannot be
 drawn legibly at 30px and a bare `64` reads as a count. A countdown
@@ -141,10 +143,16 @@ answers "how long"; a clock answers "when can I start again", which is the
 thing you plan around. Hovering gives both, plus which source the reading came
 from.
 
-**Only Claude Code has a plan window.** The other harnesses bill per token and
-expose no equivalent, so the rings are labelled as Claude's and everything else
-reports tokens and cost per session. A single blended "usage" number across
-harnesses would be a fiction, so there isn't one.
+Every other harness pages to what it actually reports - tokens, and cost where
+it knows one (`462k tok / $0.92`), or an explicit "no usage reported" rather
+than a zero that would read as free.
+
+![Paging to opencode usage](docs/usage-opencode.png)
+
+**Only Claude Code has a plan window.** The others bill per token and expose no
+equivalent, which is exactly why this pages instead of blending: a percentage of
+a subscription and a token count are not comparable numbers, and stacking them
+in one row would imply they are.
 
 Per-session state is carried three ways, so colour is never the only channel:
 

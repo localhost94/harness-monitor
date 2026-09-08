@@ -20,6 +20,11 @@ Notable changes to HarnessMonitor. Format follows
   Claude Code's token figures are new - its state file has none, so the adapter
   now tails the session transcript with a byte cursor and folds in only what was
   appended, skipping sidechain lines so subagent turns are not double-counted.
+- A **usage pager** in the pill: `‹ CC ›` steps through the detected harnesses,
+  defaulting to Claude Code and remembering the choice. Claude's page shows the
+  5h/7d plan rings; every other harness shows the tokens and cost it reports.
+  Paging rather than blending, because a percentage of a subscription and a
+  token count are not comparable figures.
 - A line in the expanded list stating that the 5h/7d rings are Claude's plan
   window and that other harnesses bill per token, since nothing else exposes an
   equivalent and a blended figure would be fiction.
