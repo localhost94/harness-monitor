@@ -15,7 +15,7 @@ export const MOCK_SNAPSHOT: Snapshot = {
     five_hour_pct: 64,
     five_hour_resets_at: new Date(Date.now() + 97 * 60_000).toISOString(),
     seven_day_pct: 34,
-    seven_day_resets_at: null,
+    seven_day_resets_at: new Date(Date.now() + 61 * 3600_000).toISOString(),
   },
   reseed: false,
   sessions: [

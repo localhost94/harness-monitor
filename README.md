@@ -101,8 +101,15 @@ something is waiting on you, and the row tints in the list.
 Next to the headline sit three counts, always in the same order so they can be
 read by position: **running / idle / waiting for you**. Zeroes stay visible but
 dim - "nothing is waiting" is information, and a vanishing chip would shift the
-other two. After a divider come the per-harness counts, and on the right a ring
-showing the 5-hour plan window.
+other two. After a divider come the per-harness counts; harnesses that are
+installed but idle collapse into a `+N` chip that still names them on hover.
+
+On the right sit **both Claude plan windows** - 5-hour and 7-day - each as a
+ring with the percentage inside and, under the label, the wall-clock time it
+resets (`↻ 12:22`, or `↻ Thu 23:45` when the reset is days out). A countdown
+answers "how long"; a clock answers "when can I start again", which is the
+thing you plan around. Hovering gives both, plus which source the reading came
+from.
 
 Per-session state is carried three ways, so colour is never the only channel:
 

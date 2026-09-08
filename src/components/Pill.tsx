@@ -123,13 +123,7 @@ export function Pill() {
               {headline}
             </span>
           </div>
-          <Quota
-            quota={snapshot?.quota ?? null}
-            now={now}
-            tone={surface}
-            withLabel
-            pending={!snapshot}
-          />
+          <Quota quota={snapshot?.quota ?? null} now={now} tone={surface} stack pending={!snapshot} />
         </div>
 
         <StatStrip sessions={sessions} vertical />
@@ -170,7 +164,7 @@ export function Pill() {
         </div>
 
         {/* One row: counts first (the answer), harnesses second (the where). */}
-        <div data-tauri-drag-region className="flex items-center gap-1.5">
+        <div data-tauri-drag-region className="flex min-w-0 items-center gap-1.5 overflow-hidden">
           <StatStrip sessions={sessions} />
           <span
             data-tauri-drag-region
@@ -181,7 +175,7 @@ export function Pill() {
         </div>
       </div>
 
-      <Quota quota={snapshot?.quota ?? null} now={now} tone={surface} pending={!snapshot} />
+      <Quota quota={snapshot?.quota ?? null} now={now} tone={surface} stack pending={!snapshot} />
 
       {/* Four icons in 2x2: a single column would not fit 80px of height. */}
       <div className="grid grid-cols-2 gap-px">{controls}</div>

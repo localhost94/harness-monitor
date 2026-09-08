@@ -15,6 +15,34 @@ export function duration(sinceMs: number, now: number): string {
   return `${hours}h ${mins % 60}m`;
 }
 
+/**
+ * Wall-clock time of a reset, in the viewer's own timezone: "13:00".
+ *
+ * A countdown answers "how long", a clock answers "when I can start again",
+ * and the second one is what you plan around.
+ */
+export function clockTime(iso: string | null): string | null {
+  if (!iso) return null;
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  return at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/** Same, plus the weekday - for a reset that is days out, the time alone is ambiguous. */
+export function dayAndTime(iso: string | null): string | null {
+  if (!iso) return null;
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  const sameDay = at.toDateString() === new Date().toDateString();
+  const time = at.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  if (sameDay) return time;
+  return `${at.toLocaleDateString(undefined, { weekday: "short" })} ${time}`;
+}
+
 /** Time until an absolute ISO reset stamp. Never extrapolated past it. */
 export function untilReset(iso: string | null, now: number): string | null {
   if (!iso) return null;

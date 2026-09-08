@@ -6,6 +6,15 @@ Notable changes to HarnessMonitor. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- The **7-day plan window** alongside the 5-hour one, both as rings, and each
+  labelled with the **wall-clock time it resets** rather than only a countdown.
+  The data was already being collected; only the 5-hour figure was shown.
+- Harnesses that are detected but have no live sessions collapse into a `+N`
+  chip in the horizontal pill, which frees the width the second quota window
+  needed. Hovering names them.
+
 ## [0.1.1] - 2026-09-07
 
 ### Added

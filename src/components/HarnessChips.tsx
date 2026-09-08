@@ -30,14 +30,21 @@ export function HarnessChips({
     counts.set(session.key.harness, entry);
   }
 
+  const entries = [...counts.entries()];
+  // Horizontally there is no room for five chips beside the counts and the
+  // quota, and a harness with no sessions is the least useful of them - so the
+  // empty ones collapse into a single "+N" that still names them on hover.
+  const shown = vertical ? entries : entries.filter(([, c]) => c.total > 0);
+  const hidden = vertical ? [] : entries.filter(([, c]) => c.total === 0);
+
   return (
     <div
       data-tauri-drag-region
       // Vertical strip: two columns, so five harnesses do not turn the widget
       // into a ladder.
-      className={vertical ? "grid grid-cols-2 gap-1" : "flex items-center gap-1"}
+      className={vertical ? "grid grid-cols-2 gap-1" : "flex min-w-0 items-center gap-1"}
     >
-      {[...counts.entries()].map(([harness, { total, attention }]) => (
+      {shown.map(([harness, { total, attention }]) => (
         <span
           key={harness}
           data-tauri-drag-region
@@ -57,6 +64,15 @@ export function HarnessChips({
           {total}
         </span>
       ))}
+      {hidden.length > 0 && (
+        <span
+          data-tauri-drag-region
+          title={`Detected but idle: ${hidden.map(([h]) => HARNESS_LABEL[h]).join(", ")}`}
+          className="shrink-0 rounded-md bg-indigo-950/[0.06] px-1 py-px text-[9px] font-semibold tabular-nums text-indigo-950/45 ring-1 ring-inset ring-indigo-950/10 dark:bg-white/[0.07] dark:text-white/45 dark:ring-white/10"
+        >
+          +{hidden.length}
+        </span>
+      )}
     </div>
   );
 }
