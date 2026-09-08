@@ -1,4 +1,4 @@
-import type { AgentSession, SessionState } from "../types";
+import type { AgentSession, SessionState, TokenCounts } from "../types";
 
 export function shortName(session: AgentSession): string {
   if (session.name) return session.name;
@@ -51,6 +51,37 @@ export function untilReset(iso: string | null, now: number): string | null {
   const left = target - now;
   if (left <= 0) return "resetting";
   return duration(now - left, now);
+}
+
+/** Compact token count: 1.2M, 953k, 412. */
+export function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return `${n}`;
+}
+
+export function formatCost(n: number): string {
+  return n >= 10 ? `$${n.toFixed(0)}` : `$${n.toFixed(2)}`;
+}
+
+/**
+ * The headline token figure is input + output: cache reads run into the
+ * hundreds of millions on a long Claude Code session and would swamp
+ * everything else in a chip this size. The full breakdown goes in the tooltip.
+ */
+export function tokenHeadline(t: TokenCounts): number {
+  return t.input + t.output + t.reasoning;
+}
+
+export function tokenBreakdown(t: TokenCounts): string {
+  const parts = [
+    `in ${t.input.toLocaleString()}`,
+    `out ${t.output.toLocaleString()}`,
+  ];
+  if (t.reasoning) parts.push(`reasoning ${t.reasoning.toLocaleString()}`);
+  if (t.cache_read) parts.push(`cache read ${t.cache_read.toLocaleString()}`);
+  if (t.cache_write) parts.push(`cache write ${t.cache_write.toLocaleString()}`);
+  return parts.join(" · ");
 }
 
 export const STATE_LABEL: Record<SessionState, string> = {

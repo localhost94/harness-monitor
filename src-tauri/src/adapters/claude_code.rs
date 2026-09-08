@@ -11,14 +11,35 @@
 
 use anyhow::Result;
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 
 use super::HarnessAdapter;
 use crate::liveness::{self, Liveness};
-use crate::model::{AgentSession, FidelityTier, HarnessId, SessionKey, SessionState};
+use crate::model::{AgentSession, FidelityTier, HarnessId, SessionKey, SessionState, TokenCounts};
 use crate::paths::PathResolver;
 
-pub struct ClaudeCodeAdapter;
+#[derive(Default)]
+pub struct ClaudeCodeAdapter {
+    /// Per session id: how far we have read its transcript, and the totals so
+    /// far. Transcripts are append-only, so re-reading from the start every
+    /// tick would be pure waste - we keep a byte offset and read only what is
+    /// new, the same shape as opencode's event cursor.
+    usage: HashMap<String, TranscriptCursor>,
+}
+
+#[derive(Default)]
+struct TranscriptCursor {
+    offset: u64,
+    totals: TokenCounts,
+}
+
+/// A transcript larger than this is tailed from the end rather than parsed in
+/// full, so a months-old session cannot stall a tick. Its earlier tokens are
+/// then missing, which is why the UI shows this as a running total rather than
+/// a lifetime figure.
+const MAX_FULL_PARSE_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,13 +91,139 @@ impl HarnessAdapter for ClaudeCodeAdapter {
                 continue; // sibling <pid>.<sha>.key files
             }
             match parse_session_file(&path) {
-                Ok(Some(session)) => out.push(session),
+                Ok(Some(mut session)) => {
+                    // Claude Code's state file has no token counts; those live
+                    // in the session transcript.
+                    session.tokens = self.read_usage(paths, &session);
+                    out.push(session)
+                }
                 Ok(None) => {}
                 Err(err) => tracing::debug!(?path, %err, "skipping unreadable session file"),
             }
         }
         Ok(out)
     }
+}
+
+impl ClaudeCodeAdapter {
+    fn read_usage(&mut self, paths: &PathResolver, session: &AgentSession) -> Option<TokenCounts> {
+        let transcript = paths
+            .claude_root()
+            .join("projects")
+            .join(project_slug(&session.cwd))
+            .join(format!("{}.jsonl", session.session_id));
+
+        let cursor = self.usage.entry(session.session_id.clone()).or_default();
+        match accumulate(&transcript, cursor) {
+            Ok(()) => Some(cursor.totals),
+            Err(err) => {
+                tracing::debug!(?transcript, %err, "transcript unreadable");
+                // Zeroed totals would read as "this session used nothing".
+                if cursor.offset == 0 {
+                    None
+                } else {
+                    Some(cursor.totals)
+                }
+            }
+        }
+    }
+}
+
+/// Claude Code names a project directory after its cwd with every separator
+/// flattened to a dash: /mnt/c/D/agent -> -mnt-c-D-agent.
+fn project_slug(cwd: &Path) -> String {
+    cwd.to_string_lossy()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect()
+}
+
+/// Reads the bytes appended since last time and folds their usage into the
+/// running totals.
+fn accumulate(path: &Path, cursor: &mut TranscriptCursor) -> Result<()> {
+    let mut file = std::fs::File::open(path)?;
+    let len = file.metadata()?.len();
+
+    if cursor.offset == 0 && len > MAX_FULL_PARSE_BYTES {
+        cursor.offset = len;
+        return Ok(());
+    }
+    // Truncated or replaced (a resumed session can rewrite its transcript):
+    // start over rather than reading from a meaningless offset.
+    if len < cursor.offset {
+        cursor.offset = 0;
+        cursor.totals = TokenCounts::default();
+    }
+    if len == cursor.offset {
+        return Ok(());
+    }
+
+    file.seek(SeekFrom::Start(cursor.offset))?;
+    let mut fresh = String::new();
+    file.take(len - cursor.offset).read_to_string(&mut fresh)?;
+
+    // A tick can land mid-write, so stop at the last complete line and leave
+    // the partial one for next time.
+    let complete_to = match fresh.rfind('\n') {
+        Some(idx) => idx + 1,
+        None => return Ok(()),
+    };
+
+    for line in fresh[..complete_to].lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let Ok(entry) = serde_json::from_str::<TranscriptLine>(line) else {
+            continue;
+        };
+        // Subagent turns are billed to the same account but belong to their
+        // own sidechain; counting them here would double-count the parent.
+        if entry.is_sidechain.unwrap_or(false) || entry.entry_type.as_deref() != Some("assistant") {
+            continue;
+        }
+        let Some(usage) = entry.message.and_then(|m| m.usage) else {
+            continue;
+        };
+        cursor.totals.input += usage.input_tokens.unwrap_or(0);
+        cursor.totals.output += usage.output_tokens.unwrap_or(0);
+        cursor.totals.cache_read += usage.cache_read_input_tokens.unwrap_or(0);
+        cursor.totals.cache_write += usage.cache_creation_input_tokens.unwrap_or(0);
+        cursor.totals.reasoning += usage
+            .output_tokens_details
+            .and_then(|d| d.thinking_tokens)
+            .unwrap_or(0);
+    }
+
+    cursor.offset += complete_to as u64;
+    Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+struct TranscriptLine {
+    #[serde(rename = "type")]
+    entry_type: Option<String>,
+    #[serde(rename = "isSidechain")]
+    is_sidechain: Option<bool>,
+    message: Option<TranscriptMessage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TranscriptMessage {
+    usage: Option<TranscriptUsage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TranscriptUsage {
+    input_tokens: Option<i64>,
+    output_tokens: Option<i64>,
+    cache_read_input_tokens: Option<i64>,
+    cache_creation_input_tokens: Option<i64>,
+    output_tokens_details: Option<OutputDetails>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OutputDetails {
+    thinking_tokens: Option<i64>,
 }
 
 fn parse_session_file(path: &PathBuf) -> Result<Option<AgentSession>> {

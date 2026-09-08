@@ -6,7 +6,15 @@ import {
   type AgentSession,
   type HarnessId,
 } from "../types";
-import { duration, ROW_TINT, shortName } from "../lib/format";
+import {
+  duration,
+  formatCost,
+  formatTokens,
+  ROW_TINT,
+  shortName,
+  tokenBreakdown,
+  tokenHeadline,
+} from "../lib/format";
 import { StateChip } from "./StateBadge";
 import { useMonitor } from "../store/useMonitor";
 
@@ -64,6 +72,7 @@ export function SessionList() {
             </span>
             <span className={HARNESS_TEXT[harness]}>{HARNESS_LABEL[harness]}</span>
             <span className="text-zinc-400 dark:text-zinc-600">{sessions.length}</span>
+            <Aggregate sessions={sessions} />
           </h2>
           {sessions.length === 0 ? (
             <p className="px-1 text-[11px] text-zinc-400 dark:text-zinc-600">no live sessions</p>
@@ -80,6 +89,15 @@ export function SessionList() {
         </section>
       ))}
       {snapshot.detected.length === 0 && <Empty>no harness data found on this host</Empty>}
+      {/* The rings in the pill are a Claude subscription window; nothing else
+          here has an equivalent. Saying so once beats implying the numbers are
+          comparable. */}
+      {snapshot.detected.some((h) => h !== "claude-code") && (
+        <p className="px-1 pt-1 text-[9px] leading-snug text-zinc-400 dark:text-zinc-500">
+          The 5h / 7d rings are Claude&apos;s plan window — only Claude Code reports one. The other
+          harnesses bill per token, so they show tokens and cost per session instead.
+        </p>
+      )}
       {error && (
         <p className="rounded-lg bg-rose-500/15 px-2 py-1 text-[10px] text-rose-700 ring-1 ring-inset ring-rose-500/30 dark:text-rose-300">
           {error}
@@ -143,6 +161,19 @@ function Row({ session, now }: { session: AgentSession; now: number }) {
           title={session.cwd}
         >
           {session.cwd}
+          {session.tokens && tokenHeadline(session.tokens) > 0 && (
+            <span
+              className="ml-1 tabular-nums text-zinc-600 dark:text-zinc-300"
+              title={tokenBreakdown(session.tokens)}
+            >
+              · {formatTokens(tokenHeadline(session.tokens))} tok
+            </span>
+          )}
+          {session.cost !== null && session.cost > 0 && (
+            <span className="ml-1 tabular-nums text-emerald-700 dark:text-emerald-400">
+              · {formatCost(session.cost)}
+            </span>
+          )}
           {note && <span className="ml-1 text-zinc-400 dark:text-zinc-500">· {note}</span>}
         </div>
       </div>
@@ -184,6 +215,37 @@ function Row({ session, now }: { session: AgentSession; now: number }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Per-harness totals. Claude Code reports no per-session cost (a subscription
+ * has none to report), while opencode does - so this shows whichever the
+ * harness actually gives, rather than a blank or a zero that would read as
+ * "free".
+ */
+function Aggregate({ sessions }: { sessions: AgentSession[] }) {
+  let tokens = 0;
+  let cost = 0;
+  for (const s of sessions) {
+    if (s.tokens) tokens += tokenHeadline(s.tokens);
+    if (s.cost) cost += s.cost;
+  }
+  if (tokens === 0 && cost === 0) return null;
+
+  return (
+    <span className="ml-auto flex items-center gap-1.5 font-normal normal-case tracking-normal">
+      {tokens > 0 && (
+        <span className="tabular-nums text-zinc-500 dark:text-zinc-400">
+          {formatTokens(tokens)} tok
+        </span>
+      )}
+      {cost > 0 && (
+        <span className="tabular-nums text-emerald-700 dark:text-emerald-400">
+          {formatCost(cost)}
+        </span>
+      )}
+    </span>
   );
 }
 

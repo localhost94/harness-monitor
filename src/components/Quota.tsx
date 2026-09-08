@@ -121,8 +121,10 @@ function Window({
       className="flex shrink-0 items-center gap-1"
       title={
         staleAge
-          ? `${label} window: ${pct.toFixed(0)}% used as of ${staleAge} ago — the source went quiet`
-          : `${label} window: ${pct.toFixed(0)}% used${left ? `, ${left} left` : ""} (from ${source})`
+          ? `Claude plan, ${label} window: ${pct.toFixed(0)}% used as of ${staleAge} ago — the source went quiet`
+          : `Claude plan, ${label} window: ${pct.toFixed(0)}% used${
+              left ? `, ${left} left` : ""
+            } (from ${source}). Other harnesses have no plan window; their usage shows per session.`
       }
     >
       <div className="relative flex h-[30px] w-[30px] shrink-0 items-center justify-center">

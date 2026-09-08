@@ -104,6 +104,12 @@ dim - "nothing is waiting" is information, and a vanishing chip would shift the
 other two. After a divider come the per-harness counts; harnesses that are
 installed but idle collapse into a `+N` chip that still names them on hover.
 
+Each row carries its own usage — tokens for every harness that reports them,
+plus cost where the harness knows it (opencode does; a Claude subscription has
+no per-session price to report). Harness headers total their group. Claude
+Code's figures come from tailing the session transcript, so they are a running
+total from when the app first saw that session.
+
 On the right sit **both Claude plan windows** - 5-hour and 7-day - each as a
 ring paired with its figure - `5h 64%` on one line, the wall-clock reset time
 under it (`↻ 12:22`, or `↻ Fri 00:05` when the reset is days out). The
@@ -112,6 +118,11 @@ drawn legibly at 30px and a bare `64` reads as a count. A countdown
 answers "how long"; a clock answers "when can I start again", which is the
 thing you plan around. Hovering gives both, plus which source the reading came
 from.
+
+**Only Claude Code has a plan window.** The other harnesses bill per token and
+expose no equivalent, so the rings are labelled as Claude's and everything else
+reports tokens and cost per session. A single blended "usage" number across
+harnesses would be a fiction, so there isn't one.
 
 Per-session state is carried three ways, so colour is never the only channel:
 

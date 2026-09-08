@@ -1,6 +1,6 @@
 //! Snapshot source. Two shapes, one output channel.
 //!
-//! Linux/WSLg build: adapters run in-process.
+//! Linux/WSLg and macOS builds: adapters run in-process.
 //! Windows build: the same binary is launched inside WSL with `--agent` and
 //! streams NDJSON back over stdout. Nothing reads `\\wsl.localhost`.
 //!

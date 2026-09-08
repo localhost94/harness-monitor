@@ -27,7 +27,7 @@ pub trait HarnessAdapter: Send {
 
 pub fn all() -> Vec<Box<dyn HarnessAdapter>> {
     vec![
-        Box::new(claude_code::ClaudeCodeAdapter),
+        Box::new(claude_code::ClaudeCodeAdapter::default()),
         Box::new(opencode::OpenCodeAdapter::default()),
         Box::new(codex::CodexAdapter::default()),
         Box::new(gemini::GeminiAdapter),

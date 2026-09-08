@@ -102,6 +102,22 @@ It is never computed from token counts. The server's own numbers show why:
 `extra_used_credits: 50253` against `extra_limit_credits: 10000`, with the
 percentage field clamped at 100.
 
+**Only Claude Code has such a window at all.** opencode, codex and gemini-cli
+bill per token, so they report usage per session and nothing plan-shaped. The
+UI keeps those separate rather than blending them into one number, which would
+be meaningless.
+
+Per-session token figures come from different places per harness. opencode and
+codex denormalise them onto their own rows; Claude Code does not put them in
+its state file, so its adapter tails the session transcript
+(`~/.claude/projects/<cwd-slug>/<sessionId>.jsonl`), keeping a byte offset per
+session and folding only the newly appended `message.usage` blocks into a
+running total. Sidechain (subagent) lines are skipped, since their tokens are
+already attributed to the parent turn. A transcript over 64 MB is tailed from
+the end instead of parsed in full, so an ancient session cannot stall a tick -
+which is why the figure is a running total from first sight, not a lifetime
+one.
+
 ## Jumping to a session
 
 Adapters know what a session is doing; they cannot know where it is. herdr - a

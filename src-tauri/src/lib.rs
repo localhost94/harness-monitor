@@ -107,6 +107,12 @@ pub fn run_ui(test_notify: bool) {
             focus_session
         ])
         .setup(move |app| {
+            // A floating pill lives on the tray, not the Dock. Accessory drops
+            // the Dock icon and the app menu bar, which is also what carries the
+            // window's skipTaskbar intent on macOS - that flag is a no-op there.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             notify_out::startup_check();
             if test_notify {
                 notify_out::send(

@@ -16,7 +16,8 @@ pub enum Liveness {
     Alive,
     Dead,
     /// Cannot be determined on this host (e.g. a Linux pid seen from Windows,
-    /// which lives in a different pid namespace entirely).
+    /// which lives in a different pid namespace entirely, or macOS, which has
+    /// no procfs and no implementation here yet - see the `not(linux)` arm).
     Unknown,
 }
 
@@ -29,6 +30,10 @@ pub fn check(pid: i64, proc_start: &str) -> Liveness {
     }
 }
 
+/// macOS falls here too. A real check needs `sysctl(KERN_PROC_PID)` and, before
+/// that, knowledge of what Claude Code writes into `procStart` on macOS - it
+/// cannot be the Linux value, which is /proc ticks since boot. Until then a
+/// macOS build shows ghost sessions rather than risk dropping live ones.
 #[cfg(not(target_os = "linux"))]
 pub fn check(_pid: i64, _proc_start: &str) -> Liveness {
     Liveness::Unknown

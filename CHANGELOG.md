@@ -8,6 +8,15 @@ Notable changes to HarnessMonitor. Format follows
 
 ### Added
 
+- **Per-session usage for every harness that reports it**, on each row and
+  totalled per harness: tokens everywhere, plus cost where the harness knows it.
+  Claude Code's token figures are new - its state file has none, so the adapter
+  now tails the session transcript with a byte cursor and folds in only what was
+  appended, skipping sidechain lines so subagent turns are not double-counted.
+- A line in the expanded list stating that the 5h/7d rings are Claude's plan
+  window and that other harnesses bill per token, since nothing else exposes an
+  equivalent and a blended figure would be fiction.
+
 - The **7-day plan window** alongside the 5-hour one, both as rings, and each
   labelled with the **wall-clock time it resets** rather than only a countdown.
   The data was already being collected; only the 5-hour figure was shown.
