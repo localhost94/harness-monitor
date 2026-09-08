@@ -24,6 +24,23 @@ running that session.
 |---|---|---|
 | ![light](docs/light.png) | ![dark](docs/dark.png) | ![vertical](docs/vertical.png) |
 
+## Contents
+
+[Install](#install) &middot;
+[Why it reads what it reads](#why-it-reads-what-it-reads) &middot;
+[Architecture](#architecture) &middot;
+[Reading the pill](#reading-the-pill) &middot;
+[Jump to a session](#jump-to-a-session) &middot;
+[Notification rules](#notification-rules) &middot;
+[Usage numbers](#usage-numbers) &middot;
+[Harness support](#harness-support) &middot;
+[Build and run](#build-and-run) &middot;
+[Why not one of the others](#why-not-one-of-the-others) &middot;
+[Documentation](#documentation) &middot;
+[Known limits](#known-limits) &middot;
+[Contributing](#contributing) &middot;
+[License](#license)
+
 ## Install
 
 ### Windows
@@ -35,7 +52,10 @@ the `.exe`:
 | Your Windows | Take these two |
 |---|---|
 | Intel / AMD (most machines) | `harness-monitor-x64.exe` + `harness-monitor-agent-x64` |
-| Snapdragon / ARM64 | `harness-monitor-arm64.exe` + `harness-monitor-agent-arm64` |
+| Snapdragon / ARM64 | build it yourself with `scripts/build-windows.sh` + `harness-monitor-agent-arm64` |
+
+CI publishes the x64 exe only. For ARM64 the agent is published but the exe is
+not, so cross-compile it from WSL - see [Build and run](#build-and-run).
 
 Rename the agent to `harness-monitor-agent` (or point at it with
 `HM_AGENT_PATH`) and keep it beside the `.exe`. The two must match your
@@ -254,11 +274,11 @@ to re-run):
 
 | Harness | State | Usage | Source |
 |---|---|---|---|
-| Claude Code | full - reported by the harness | plan window | `~/.claude/sessions/*.json` |
-| opencode | running/idle, inferred | cost + 5 token counters | `opencode.db` (`session`, `message`) |
-| codex | running/idle, inferred | `tokens_used` | `state_5.sqlite`, `queue_1.sqlite` |
-| gemini-cli | recency only | per-message tokens | `~/.gemini/tmp/*/chats/*.json` |
-| antigravity | activity only | none | protobuf conversations (mtime) |
+| <img src="https://cdn.simpleicons.org/claude" width="16" height="16" alt=""> **Claude Code** | full - reported by the harness | plan window | `~/.claude/sessions/*.json` |
+| <img src="https://cdn.simpleicons.org/opencode/000/fff" width="16" height="16" alt=""> **opencode** | running/idle, inferred | cost + 5 token counters | `opencode.db` (`session`, `message`) |
+| <img src="https://github.com/openai.png?size=32" width="16" height="16" alt=""> **codex** | running/idle, inferred | `tokens_used` | `state_5.sqlite`, `queue_1.sqlite` |
+| <img src="https://cdn.simpleicons.org/googlegemini" width="16" height="16" alt=""> **gemini-cli** | recency only | per-message tokens | `~/.gemini/tmp/*/chats/*.json` |
+| <img src="https://github.com/google.png?size=32" width="16" height="16" alt=""> **antigravity** | activity only | none | protobuf conversations (mtime) |
 
 The UI labels anything below full fidelity, so an inferred state is never
 mistaken for a reported one. opencode permission prompts are deliberately not
@@ -420,3 +440,19 @@ one place.
 - Quota is Claude-only. Other harnesses have their own independent limits, so
   a single blended "usage" number across harnesses would be fiction; their
   cost is shown separately.
+
+## Contributing
+
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the
+adapter contract and the rules a new harness has to keep; the short version is
+that `cargo test` and `cargo clippy --all-targets` must be clean, and a UI
+change wants a screenshot from `scripts/preview.sh` in both themes.
+
+By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE).
+
+Harness names and logos belong to their respective owners and are used here to
+identify what this tool reads. No affiliation or endorsement is implied.
