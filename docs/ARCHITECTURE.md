@@ -19,7 +19,7 @@ WSL data directly:
    `pidDomain` like `linux:...:pid:[4026532225]` - a pid inside a Linux pid
    namespace. A Windows process enumerating Windows processes can never verify
    it. Without that check the app shows every stale file as a live session: on
-   the development machine, 23 files and 2 live processes, several frozen
+   the development machine, 61 files and 5 live processes, several frozen
    mid-turn since February.
 2. **opencode's database is WAL.** Opening it read-only over a 9p share needs
    shared-memory the filesystem cannot provide.
@@ -38,10 +38,13 @@ macOS sits on the Linux side of that split. `spawn_source` dispatches on
 in-process and ships as one self-contained `.app` - there is no agent half to
 download. The one thing it does not inherit is reason 1 above: liveness is a
 `/proc/<pid>/stat` read, macOS has no procfs, and `liveness::check` therefore
-returns `Unknown` for every pid. Ghost sessions survive the filter on macOS
-until someone implements the `sysctl(KERN_PROC_PID)` equivalent - which first
-requires knowing what Claude Code writes into `procStart` there, since the
-Linux value is kernel ticks since boot and cannot be it.
+returns `Unknown` for every pid. An unverifiable pid is filed as *ended*
+rather than shown as live - see the two lists below - which keeps the pill's
+counts honest but leaves the live list empty on a Mac that is running Claude
+Code. It stops there until someone implements the `sysctl(KERN_PROC_PID)`
+equivalent, which first requires knowing what Claude Code writes into
+`procStart` there, since the Linux value is kernel ticks since boot and cannot
+be it.
 
 ## Snapshots, not streams
 
@@ -69,6 +72,85 @@ after the **last** `)` because the comm field can contain spaces and parens.
 Process names are useless for this: a live Claude Code process is named after
 its version (`2.1.259`), not `claude`.
 
+## Two lists, not one
+
+`Snapshot` carries `sessions` and `ended`, and the split is the whole safety
+argument of this app.
+
+Everything downstream reads only `sessions`: the differ, the pill's headline,
+the running/idle/waiting counts, the per-harness chips, the usage pager. A
+session lands in `ended` when its process is gone - `~/.claude/sessions` is one
+file per CLI process and nothing ever deletes it, so on this machine 61 files
+and 5 live processes - or, for the harnesses with no process behind a session,
+when its row falls outside the recency window the live query already applies.
+
+Putting them in one list and filtering would have been one line shorter and one
+bug away from a false toast: a dead pid's file still says `busy`, and the rule
+that fires "turn complete" on `busy -> idle` would be one rewritten file away
+from announcing a process that died months ago. Two lists make it structural -
+there is no code path from `ended` to a notification, so there is no rule to
+forget. `differ::tests::ended_sessions_are_invisible_to_the_differ` and
+`a_session_in_both_lists_fires_once` hold that line.
+
+The live/ended decision is made in one function per adapter
+(`parse_session_file` for Claude Code) and returned alongside the row, so no
+caller can put a session in the wrong list by forgetting a condition.
+
+Two consequences worth stating rather than hiding:
+
+- **An ended row carries no state.** Its file still holds whatever the harness
+  last wrote. Showing `busy` for a process that exited in March is a lie, and
+  showing `idle` is a different lie, so ended rows get their own `Ended` state
+  and the UI prints `ended` plus how long ago it was last touched.
+- **Token totals are not read for ended sessions.** Claude Code's totals come
+  from tailing the transcript, and a dead session's transcript cannot grow, so
+  that is a full parse of every historical transcript on every refresh in
+  exchange for a number nobody is waiting for. The state file alone is enough to
+  list the session.
+
+The split is about **notification**, not about capability. An ended row can be
+reopened - it has a session id and a directory, which is enough to start the
+same harness on the same conversation - and that path is `rerun.rs`, called
+directly by a Tauri command and never routed through the differ. "No code path
+from `ended` to a *notification*" still holds; "nothing downstream reads
+`ended`" does not, and would be the wrong claim to make now that it is true for
+one thing.
+
+## Settings cross a process boundary
+
+`settings.json` lives in `ui_state_dir()` and is read and written **only by the
+UI process**. The Windows scanner is not in that process - it is
+`harness-monitor-agent --agent` running inside WSL, speaking NDJSON on stdout -
+so it cannot read a file in the Windows user's `%LOCALAPPDATA%`, and there is no
+channel to ask it to.
+
+So the values the scanner needs travel as command-line arguments at spawn:
+`--interval-ms`, `--max-ended`, `--harnesses`. The same is true of the one-shot
+that reopens a session. Two consequences follow, and both are visible in the UI:
+
+- **Scan settings need a restart, and the settings popover says so.** They are
+  fixed when the agent process starts, so editing them cannot change a running
+  scanner. `Settings::needs_restart` decides whether to show that note, and the
+  group heading carries `on restart` whether or not anything has changed yet.
+- **Everything else applies immediately.** Mute, the "quiet while focused" rule
+  and all three resume preferences are read on the UI side, where the write
+  already happened.
+
+The rule for which store a preference belongs in: does the **first render** need
+it, or the **running pipeline**? Appearance does - it is read synchronously
+while the store is created, because the widget is on screen before any IPC
+resolves - so it stays in `localStorage`. Pipeline settings are the other case.
+
+A missing, truncated or future-versioned file falls back to the defaults rather
+than stopping the app, and every numeric value is clamped on the way in and out.
+`interval_ms: 0` would otherwise have the scanner spinning a core.
+
+The ended list is rebuilt every 20 ticks (30 s at the default interval) rather
+than every tick: it changes when you start and stop work, not 1.5 times a
+second, and rebuilding it means a full table scan of opencode's session table.
+The live-over-ended filter runs every tick regardless, so a session that has just
+started cannot appear in both lists during the window between refreshes.
+
 ## The differ's rules, and what each one prevents
 
 | Rule | Prevents |
@@ -79,7 +161,7 @@ its version (`2.1.259`), not `claude`.
 | 30s cooldown per session | Flapping between tool calls, the dominant storm source |
 | Repeat guard on attention within 5 minutes, unless the reason changed | "Needs you" repeated for the same prompt |
 | Global cap of 3 per 10s, rest coalesced | A resume storm burying the desktop |
-| A session that fails liveness, or vanishes, is forgotten silently | A deleted state file reading as a completed turn |
+| A session that fails liveness never reaches here at all; one that vanishes is forgotten silently | A deleted state file reading as a completed turn |
 
 ## Fidelity is labelled, not averaged
 

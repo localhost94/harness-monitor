@@ -1,10 +1,17 @@
 import { modeOf, surfaceFor } from "../lib/theme";
-import { useMonitor } from "../store/useMonitor";
+import { nextShape, useMonitor, type Shape } from "../store/useMonitor";
 import { DragGrip } from "./DragGrip";
 import { HarnessChips } from "./HarnessChips";
 import { UsagePager } from "./UsagePager";
 import { StatStrip } from "./StatStrip";
 import { Glyph } from "./StateBadge";
+
+/** What each shape is called in the button's tooltip, and how to draw it. */
+const SHAPE_LABEL: Record<Shape, string> = {
+  pill: "pill",
+  line: "one line",
+  vertical: "vertical",
+};
 
 export function Pill() {
   const {
@@ -13,13 +20,14 @@ export function Pill() {
     muted,
     now,
     theme,
-    orientation,
+    shape,
     toggleExpanded,
     toggleMuted,
     toggleTheme,
-    toggleOrientation,
+    cycleShape,
   } = useMonitor();
-  const vertical = orientation === "vertical" && !expanded;
+  const vertical = shape === "vertical" && !expanded;
+  const line = shape === "line" && !expanded;
   const sessions = snapshot?.sessions ?? [];
   const attention = sessions.filter(
     (s) => s.state === "awaiting-input" || s.state === "awaiting-permission",
@@ -27,6 +35,7 @@ export function Pill() {
   const running = sessions.filter(
     (s) => s.state === "running" || s.state === "active-unknown",
   ).length;
+  const idle = sessions.filter((s) => s.state === "idle" || s.state === "shell").length;
   const mode = modeOf(sessions);
   const surface = surfaceFor(mode);
 
@@ -50,7 +59,9 @@ export function Pill() {
           ? "all idle"
           : "no sessions";
 
-  const controls = (
+  const next: Shape = nextShape(shape);
+
+  const controls = () => (
     <>
       <IconButton
         onClick={toggleExpanded}
@@ -62,7 +73,7 @@ export function Pill() {
       <IconButton
         onClick={toggleMuted}
         title={muted ? "Notifications muted - click to unmute" : "Mute notifications"}
-        tone={muted ? "text-rose-600 dark:text-rose-400" : surface.sub}
+        tone={muted ? "text-black dark:text-white" : surface.sub}
       >
         {muted ? (
           <path d="M4 6h2l3-2.5v9L6 10H4Zm7.5-1 -3 6" />
@@ -70,12 +81,16 @@ export function Pill() {
           <path d="M4 6h2l3-2.5v9L6 10H4Zm7 -1a4 4 0 0 1 0 6" />
         )}
       </IconButton>
+      {/* Cycles all three shapes, so the glyph shows where it lands: a bar for
+          one line, stacked bars for the pill, columns for the vertical strip. */}
       <IconButton
-        onClick={toggleOrientation}
-        title={orientation === "vertical" ? "Switch to horizontal" : "Switch to vertical"}
+        onClick={() => void cycleShape()}
+        title={`Shape: ${SHAPE_LABEL[shape]} — click for ${SHAPE_LABEL[next]}`}
         tone={surface.sub}
       >
-        {orientation === "vertical" ? (
+        {next === "line" ? (
+          <path d="M2.5 7h9" />
+        ) : next === "vertical" ? (
           <path d="M2.5 4.5h9M2.5 9.5h9" />
         ) : (
           <path d="M4.5 2.5v9M9.5 2.5v9" />
@@ -103,6 +118,51 @@ export function Pill() {
 
   const shell = `relative overflow-hidden border backdrop-blur-xl ${surface.shell} ${surface.ring}`;
 
+  // One line: the same answer as the pill, in a strip you can park anywhere
+  // without spending a row of screen on it. Both quota windows stay - the one
+  // thing a shorter widget could have done is hide data, and the rings are the
+  // only place the plan window appears at all.
+  //
+  // What goes is the count strip. At 440px the pager and the four buttons
+  // leave the middle column about 120px, and three count chips need more than
+  // twice that - which is why they overlapped instead of fitting. The headline
+  // already states the count it is about ("3 running", "2 need you"), the
+  // tooltip carries the other two, and the expanded list has all three, so
+  // nothing is lost that this shape could have shown anyway.
+  if (line) {
+    return (
+      <div
+        data-drag-zone
+        data-tauri-drag-region
+        // minmax(0,1fr) plus truncate on the headline: the one column that may
+        // give way, so a long figure clips instead of landing on the rings.
+        className={`grid h-[44px] grid-cols-[5px_10px_minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-[22px] pr-1 ${shell}`}
+      >
+        <div
+          className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r to-transparent ${surface.gloss}`}
+        />
+        <div data-tauri-drag-region className={`h-full w-full ${surface.edge}`} />
+        <DragGrip />
+
+        <div data-tauri-drag-region className="flex min-w-0 items-center gap-1.5">
+          {glyph}
+          <span
+            title={`${running} running, ${idle} idle, ${attention.length} waiting for you`}
+            className={`truncate text-[13px] font-semibold tracking-tight ${surface.title}`}
+          >
+            {headline}
+          </span>
+        </div>
+
+        <div className="flex shrink-0">
+          <UsagePager snapshot={snapshot} now={now} tone={surface} inline />
+        </div>
+        {/* A row, not the pill's 2x2: 44px of height only fits one. */}
+        <div className="flex shrink-0 items-center gap-px">{controls()}</div>
+      </div>
+    );
+  }
+
   // Vertical strip: for parking along a screen edge. Same information, stacked,
   // with the counts as full-width rows so the numbers line up.
   if (vertical) {
@@ -129,7 +189,7 @@ export function Pill() {
         <StatStrip sessions={sessions} vertical />
         <HarnessChips sessions={sessions} detected={snapshot?.detected ?? []} vertical />
 
-        <div className="flex items-end justify-between gap-px self-end">{controls}</div>
+        <div className="flex items-end justify-between gap-px self-end">{controls()}</div>
       </div>
     );
   }
@@ -168,7 +228,7 @@ export function Pill() {
           <StatStrip sessions={sessions} />
           <span
             data-tauri-drag-region
-            className="h-3 w-px bg-indigo-950/15 dark:bg-white/15"
+            className="h-3 w-px bg-black/20 dark:bg-white/25"
             aria-hidden="true"
           />
           <HarnessChips sessions={sessions} detected={snapshot?.detected ?? []} />
@@ -178,7 +238,7 @@ export function Pill() {
       <UsagePager snapshot={snapshot} now={now} tone={surface} stack />
 
       {/* Four icons in 2x2: a single column would not fit 80px of height. */}
-      <div className="grid grid-cols-2 gap-px">{controls}</div>
+      <div className="grid grid-cols-2 gap-px">{controls()}</div>
     </div>
   );
 }
@@ -198,7 +258,7 @@ function IconButton({
     <button
       onClick={onClick}
       title={title}
-      className={`rounded-lg p-0.5 transition hover:bg-indigo-950/10 dark:hover:bg-white/10 ${tone}`}
+      className={`rounded-lg p-0.5 transition hover:bg-black/10 dark:hover:bg-white/10 ${tone}`}
     >
       <svg
         viewBox="0 0 14 14"

@@ -14,7 +14,7 @@ export function DragGrip() {
       <svg width="8" height="20" viewBox="0 0 8 20" aria-hidden="true">
         {[4, 10, 16].map((y) =>
           [1.5, 6.5].map((x) => (
-            <circle key={`${x}-${y}`} cx={x} cy={y} r="1.1" className="fill-zinc-400 dark:fill-zinc-600" />
+            <circle key={`${x}-${y}`} cx={x} cy={y} r="1.1" className="fill-black/35 dark:fill-white/35" />
           )),
         )}
       </svg>

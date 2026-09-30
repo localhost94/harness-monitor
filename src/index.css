@@ -19,8 +19,7 @@ body {
 }
 
 /* Running sessions breathe; waiting sessions blink. Motion carries the
-   difference even when the colour is not visible - a glance at the edge of
-   vision still tells them apart. */
+   difference even when the value is not obvious from the corner of your eye. */
 @keyframes hm-breathe {
   0%,
   100% {
@@ -51,18 +50,48 @@ body {
   animation: hm-alert 1s steps(2, end) infinite;
 }
 
+/* A launch in flight. The one place in the app where waiting is the message, so
+   it rotates rather than pulses - a pulse would read as a live session, which
+   is the one thing a finished row must never look like. */
+@keyframes hm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hm-spin {
+  animation: hm-spin 0.9s linear infinite;
+  transform-origin: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hm-breathe,
-  .hm-alert {
+  .hm-alert,
+  .hm-spin {
     animation: none;
   }
+}
+
+/* Caution hatching. With the hue gone, this is what tells a permission prompt
+   apart from a question: the one row in the list that looks like a warning
+   stripe instead of a solid block. Inverted in dark so the ink stays light. */
+.hm-hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.16) 0 2px,
+    transparent 2px 6px
+  );
+}
+
+.dark .hm-hatch {
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px 6px);
 }
 
 /* A thin, theme-aware scrollbar: the platform default is a wide grey slab
    that looks pasted onto a 440px floating panel. */
 .hm-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(79, 70, 229, 0.35) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.32) transparent;
 }
 
 .hm-scroll::-webkit-scrollbar {
@@ -74,22 +103,22 @@ body {
 }
 
 .hm-scroll::-webkit-scrollbar-thumb {
-  background: rgba(79, 70, 229, 0.32);
+  background: rgba(0, 0, 0, 0.3);
   border-radius: 99px;
 }
 
 .hm-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(79, 70, 229, 0.5);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .dark .hm-scroll {
-  scrollbar-color: rgba(165, 180, 252, 0.32) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
 .dark .hm-scroll::-webkit-scrollbar-thumb {
-  background: rgba(165, 180, 252, 0.28);
+  background: rgba(255, 255, 255, 0.26);
 }
 
 .dark .hm-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(165, 180, 252, 0.45);
+  background: rgba(255, 255, 255, 0.45);
 }

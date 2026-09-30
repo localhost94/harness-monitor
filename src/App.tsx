@@ -6,8 +6,8 @@ import { SessionList } from "./components/SessionList";
 import { useMonitor } from "./store/useMonitor";
 
 export default function App() {
-  const { init, expanded, theme, orientation } = useMonitor();
-  const vertical = orientation === "vertical" && !expanded;
+  const { init, expanded, theme, shape } = useMonitor();
+  const vertical = shape === "vertical" && !expanded;
 
   useEffect(() => {
     void init();
@@ -43,7 +43,7 @@ export default function App() {
           className={`relative mt-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border pt-2 backdrop-blur-xl ${PANEL}`}
         >
           {/* Same hairline gloss as the pill, so panel and pill read as one object. */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-white/60 to-transparent dark:from-white/12" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-black/10 to-transparent dark:from-white/15" />
           <SessionList />
         </div>
       )}

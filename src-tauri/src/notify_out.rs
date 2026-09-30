@@ -54,7 +54,8 @@ fn portal_present() -> bool {
 
 #[cfg(target_os = "linux")]
 fn linux_daemon_present() -> bool {
-    std::path::Path::new("/usr/share/dbus-1/services/org.freedesktop.Notifications.service").exists()
+    std::path::Path::new("/usr/share/dbus-1/services/org.freedesktop.Notifications.service")
+        .exists()
         || which("notify-send")
 }
 
@@ -66,9 +67,7 @@ fn linux_daemon_present() -> bool {
 #[cfg(target_os = "linux")]
 fn which(bin: &str) -> bool {
     std::env::var_os("PATH")
-        .map(|paths| {
-            std::env::split_paths(&paths).any(|dir| dir.join(bin).is_file())
-        })
+        .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(bin).is_file()))
         .unwrap_or(false)
 }
 

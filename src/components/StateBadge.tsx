@@ -41,6 +41,14 @@ function Glyph({ state }: { state: SessionState }) {
           <rect x="5.9" y="2.4" width="1.7" height="5.2" rx="0.8" />
         </svg>
       );
+    // A hollow ring: an outline with nothing in it, which is the difference
+    // between "quiet" and "over". Deliberately not the pause bars.
+    case "ended":
+      return (
+        <svg viewBox="0 0 10 10" className="h-2.5 w-2.5 fill-current" aria-hidden="true">
+          <circle cx="5" cy="5" r="3" className="fill-none stroke-current stroke-[1.3]" />
+        </svg>
+      );
     default:
       return (
         <svg viewBox="0 0 10 10" className="h-2.5 w-2.5 fill-current" aria-hidden="true">

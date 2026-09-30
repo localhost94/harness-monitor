@@ -26,6 +26,9 @@ tauri-build = { version = "2", features = [] }
 # feature and the config must agree or the build script refuses to run.
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-notification = "2"
+# Enforces one UI process at a time. Two instances would race on the SQLite
+# store, the window.json placement file and the pipeline's dedupe state.
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
@@ -36,6 +39,9 @@ dirs = "5"
 rusqlite = { version = "0.32", features = ["bundled"] }
 clap = { version = "4", features = ["derive"] }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Desktop portal is the only notification path that exists on a stock WSL.

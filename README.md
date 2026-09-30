@@ -1,6 +1,7 @@
 # HarnessMonitor
 
 [![ci](https://github.com/localhost94/harness-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/localhost94/harness-monitor/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/localhost94/harness-monitor/branch/main/graph/badge.svg)](https://codecov.io/gh/localhost94/harness-monitor)
 [![release](https://img.shields.io/github/v/release/localhost94/harness-monitor)](https://github.com/localhost94/harness-monitor/releases/latest)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -14,11 +15,11 @@ already write on your own machine: no backend, no network calls, no API keys.
 
 ![The pill moving through waiting, running and idle states](docs/demo.gif)
 
-The surface never changes colour with state - only the accents do: the rail
-down the left edge, the glyph and its motion, and a ring around the whole pill
-when something is waiting on you. Click the list icon and it expands into the
-session list, where the arrow on each row jumps straight to the terminal pane
-running that session.
+The surface never changes with state - only the weight of the ink does: the
+rail down the left edge, the glyph and its motion, and a keyline around the
+whole pill when something is waiting on you. Click the list icon and it expands
+into the session list, where the arrow on each row jumps straight to the
+terminal pane running that session.
 
 | Expanded, light | Expanded, dark | Vertical strip |
 |---|---|---|
@@ -30,7 +31,10 @@ running that session.
 [Why it reads what it reads](#why-it-reads-what-it-reads) &middot;
 [Architecture](#architecture) &middot;
 [Reading the pill](#reading-the-pill) &middot;
+[Finished sessions](#finished-sessions) &middot;
 [Jump to a session](#jump-to-a-session) &middot;
+[Run a finished session again](#run-a-finished-session-again) &middot;
+[Settings](#settings) &middot;
 [Notification rules](#notification-rules) &middot;
 [Usage numbers](#usage-numbers) &middot;
 [Harness support](#harness-support) &middot;
@@ -95,11 +99,12 @@ never guessed.
 
 Two traps that shape the whole design:
 
-- **Nothing cleans that directory up.** On the development machine: 23 files,
-  2 live processes, with dead ones frozen mid-turn for months. Every entry is
-  verified against `/proc/<pid>/stat` field 22 before it is shown or diffed.
-  Matching on process *name* would not work either - a live Claude Code process
-  is named after its version (`2.1.259`), not `claude`.
+- **Nothing cleans that directory up.** On the development machine: 61 files,
+  5 live processes, with dead ones frozen mid-turn for months. Every entry is
+  verified against `/proc/<pid>/stat` field 22 before it is shown; the ones
+  that fail are listed as finished rather than dropped, and neither list can
+  notify. Matching on process *name* would not work either - a live Claude Code
+  process is named after its version (`2.1.259`), not `claude`.
 - **`sessionId` is not unique.** Resuming a session reuses the id under a new
   pid. Session identity is `(pidDomain, pid, procStart)`.
 
@@ -121,6 +126,16 @@ namespaces, so the ghost filter above could not run), and opencode's WAL
 database cannot be opened safely over a 9p share. On **Linux/WSLg** the
 adapters run in-process and the agent role is unused.
 
+Only the UI role is single-instance. Two copies would fight over the same
+database, the same window position and the same notification stream, and there
+would be no way to tell which one is the real monitor - so a second launch
+brings the running window back to the front and exits. `--agent` is a
+one-shot producer and is deliberately exempt; so is `--test-notify`, which you
+run *while* the app is up to check whether toasts work here. On Linux the
+guarantee falls back to a pid lock file on a host with no D-Bus session bus,
+which blocks the second copy but cannot raise the first one's window (see
+[Known limits](#known-limits)).
+
 Adapters return a full snapshot each tick and nothing else - liveness,
 transitions, dedup and delivery all live in `differ.rs`, once, for every
 harness. Polling is the primary mode by design: `ReadDirectoryChangesW` does
@@ -129,16 +144,21 @@ watcher would be a fallback that never runs.
 
 ## Reading the pill
 
-The pill is 440x80 and comes in **two themes, light and dark**, both
-violet-tinted on purpose: `#F2F4FF` is not the white of a Windows dialog and
-`#252A4D` is not the near-black of a terminal or the neutral grey of editor
-chrome, so the pill never dissolves into whatever sits behind it.
+The pill is 440x80 and comes in **two themes, light and dark**, both strictly
+black and white - no hue anywhere in the interface. That is a deliberate bet
+against camouflage, because a grey widget on a grey desktop is exactly what an
+editor looks like, and this one floats over editors by design. So the surfaces
+sit at the extremes instead of the middle: true white on true black, a hard
+1px keyline all the way round, and a deep drop shadow. A terminal has a
+background but no keyline; an editor has neither. The pill reads as a printed
+card that happens to be on screen, and it cannot be mistaken for another pane.
 
-State does not repaint the surface. It shows in the accents: the gradient rail
-down the left edge (orange/rose for a permission prompt, amber for input
-needed, cyan/sky for a running turn, indigo/violet for idle), the headline
-glyph and its motion, a coloured ring drawn around the whole pill when
-something is waiting on you, and the row tints in the list.
+State never repaints the surface. It is carried by **value**: the rail down the
+left edge is full ink when something is waiting on you, 70% for a running turn,
+30% for idle and a hairline for nothing at all; the headline glyph and its
+motion; a keyline drawn around the whole pill when a session is blocked; and
+the density of the row fills in the list. Nothing in the widget is a colour
+you have to learn.
 
 Next to the headline sit three counts, always in the same order so they can be
 read by position: **running / idle / waiting for you**. Zeroes stay visible but
@@ -174,42 +194,111 @@ equivalent, which is exactly why this pages instead of blending: a percentage of
 a subscription and a token count are not comparable numbers, and stacking them
 in one row would imply they are.
 
-Per-session state is carried three ways, so colour is never the only channel:
+Per-session state is carried four ways - shape, motion, ink weight and texture -
+so nothing depends on a channel a single glance could miss:
 
 | State | Glyph | Motion | Row |
 |---|---|---|---|
-| running | play | breathes (2.2s) | sky tint, sky left border |
-| needs input | `!` | blinks (1s) | amber tint |
-| needs approval | lock | blinks (1s) | orange tint |
-| idle | pause | still | dimmed to 70% |
-| activity only | dot | breathes | grey border, "activity only" note |
+| running | play | breathes (2.2s) | 10% ink wash, hairline rule |
+| needs input | `!` | blinks (1s) | 13% wash, solid 2px rule |
+| needs approval | lock | blinks (1s) | 10% wash over a diagonal caution hatch |
+| idle | pause | still | no fill, no rule, 60% opacity |
+| activity only | dot | breathes | 30% rule, "activity only" note |
 
-`prefers-reduced-motion` disables the animation.
+The state chip is ranked the same way: a request for approval is a solid stamp
+of ink, a request for input is a hollow one with a 2px keyline, work in
+progress is a hairline outline, and anything passive is a ghost. `prefers-reduced-motion` disables the animation, which is also why the motion is never the only cue.
 
-Harnesses are told apart by a two-letter chip with its own hue - CC orange
-(Claude Code), OC emerald (opencode), CX violet (codex), GM blue (gemini-cli),
-AG fuchsia (antigravity) - kept outside the state palette so the two never read
-as the same signal. A harness that is installed but quiet shows dimmed with a
-`0`; one that is not installed is absent entirely.
+Harnesses are told apart by a two-letter chip and nothing else - CC (Claude
+Code), OC (opencode), CX (codex), GM (gemini-cli), AG (antigravity) - and the
+chip goes solid when that harness has something waiting on you. A harness that
+is installed but quiet shows a hollow mark and a dimmed `0`; one that is not
+installed is absent entirely.
 
 When there are more sessions than fit, the list scrolls: harness headers stick
 to the top so you always know which group you are reading, and anything waiting
 on you sorts first - both between harnesses and inside each one - so a dozen
 running sessions cannot push a blocked one below the fold.
 
-**Two orientations.** The horizontal pill (440x80) suits the bottom of a
-screen; the vertical strip (118x300) is for parking down a side, and stacks the
-same information - rail across the top, the headline, the quota ring labelled
-`5h used`, then the three counts as full-width rows (glyph and word on the
-left, figure hard right) and the harness chips in two columns. The strip spells
-the counts out in words: with no headline beside them, an icon and a number
-alone do not say what is being counted.
-Expanding either shape opens the same 440-wide session list, because rows are
-not readable in a 118px strip. The choice is remembered across restarts.
+**Three shapes**, cycled by one button, because where your screen is free
+decides which one you want:
+
+| Shape | Size | For |
+|---|---|---|
+| Pill | 440x80 | The bottom of a screen. Headline and counts on one line, quota rings and buttons on the right |
+| One line | 440x44 | Anywhere. The same answer in a strip that costs half the screen, harness chips dropped because that detail is what the taller pill has room for |
+| Vertical | 118x300 | A side edge. Rail across the top, headline, quota, the three counts as full-width rows (glyph and word left, figure hard right), harness chips in two columns |
+
+The vertical strip spells the counts out in words: with no headline beside
+them, an icon and a number alone do not say what is being counted. The one-line
+shape keeps both quota rings - a shorter widget could have dropped them, but the
+rings are the only place the plan window appears at all - and only loses the
+reset clock, which moves into the tooltip and is back at full size as soon as
+the list is open.
+
+Expanding any shape opens the same 440-wide session list, because rows are not
+readable in a 118px strip. The choice is remembered across restarts.
 
 Drag anywhere on the pill or strip (buttons and the session list excluded); the
 position is remembered too. The four icon buttons are expand/collapse, mute,
-orientation, and light/dark.
+shape, and light/dark.
+
+## Finished sessions
+
+The live list answers "what needs me". It cannot answer "what did I run",
+because it is empty the moment the work stops - which is exactly when you want
+to look. So the panel has two tabs: **live** and **finished**, the second
+carrying its own count.
+
+They are different views rather than one list with a filter, because they are
+different questions. "What needs me" wants grouping by harness and whatever is
+blocked first; "what did I run" wants a flat reverse-chronological run with a
+search box and a date range. One list trying to be both is worse at both.
+
+![The finished tab, with the search box and the date range](docs/finished.png)
+
+The finished view is the data the app used to throw away. On this machine
+`~/.claude/sessions` holds 61 files and 5 live processes; the rest are sessions
+from months ago, each still frozen at whatever status it died holding - usually
+`busy`, which is why listing them as *idle* would be a lie about a process that
+does not exist. Finished rows say `ended` and how long ago they were last
+touched, capped at 100 per harness (now a setting).
+
+There is one thing a finished row can do, and it is not jumping: it can be
+[reopened](#run-a-finished-session-again). A row carries a session id and a
+directory, which is enough to start the same harness on the same conversation -
+but not enough to replay it, because no adapter records the command or the prompt
+that started the session.
+
+**Search** covers name, working directory, session id, model, terminal title and
+harness. Space-separated words all have to match, so a second word narrows the
+result - a filter that returns *more* rows as you type more is worse than none.
+The session id is in there because antigravity has nothing else to go on.
+
+**Last active** filters by range: today, 7 days, 30 days, or all. "Today" is
+local midnight, not the last 24 hours, because a date filter that shows you
+yesterday evening when you ask about today is the kind of off-by-one that makes
+you stop trusting it. The timestamp being filtered is the last time the harness
+wrote to the session, which is the only one every adapter fills in; the exact
+time is in each row's tooltip behind the relative "2d ago".
+
+What decides "finished" depends on what the harness can tell us:
+
+| Harness | Finished means |
+|---|---|
+| Claude Code | The pid is gone. `procStart` is checked against `/proc`, because pids get recycled and process names are useless here - a live Claude Code process is called `2.1.259`, not `claude` |
+| opencode, codex, gemini-cli | The row fell outside the harness's own 12-hour recency window. There is no process per session to check, so "not recent" is the whole of the claim |
+| antigravity | A conversation file older than 10 minutes. Its conversations are binary protobuf with no schema, so a finished row carries the id and the timestamp and nothing else |
+
+On macOS nothing can be verified - there is no procfs - so every Claude Code
+session is filed as finished rather than shown as live. "Cannot be disproved" is
+not evidence.
+
+**These rows can never raise a notification.** They live in a separate list in
+the snapshot that the differ never reads, which is a structural guarantee rather
+than a filter someone has to remember to apply. Two integration tests hold that
+line: ghosts are listed and produce zero toasts, and a session that appears in
+both lists during a refresh fires exactly one.
 
 ## Jump to a session
 
@@ -230,6 +319,108 @@ re-invokes this same binary inside WSL in one-shot mode:
 Without herdr the arrow greys out and says why; rows still show the terminal
 tab title when it is known, which is usually enough to find the window by eye.
 
+## Run a finished session again
+
+The live list answers "where is it". The finished list answers "put me back in
+it": every row there carries a button that reopens that conversation in a
+terminal.
+
+A finished row has no pane to focus, which is why it never had a button. It does
+have a session id and a working directory, and that is enough to relaunch the
+same harness on the same conversation - so the button is **reopen**, not **jump**,
+and the two are deliberately different glyphs.
+
+**This is not a replay.** No adapter records the command, the argv or the prompt
+a session started with, so there is nothing to replay from. What the button does
+is start the harness again on the same conversation:
+
+| Harness | Button | Command |
+|---|---|---|
+| Claude Code | works | `claude --resume <id>` |
+| opencode | works | `opencode --session <id>` |
+| codex | works | `codex resume <id>` |
+| gemini-cli | **disabled** | `--resume` takes only `latest` or an index, never a session id |
+| antigravity | **disabled** | no resume flag, and the conversation lives under `~/.gemini/antigravity` rather than a project |
+
+Those two rows carry a button that is disabled and says why, because a greyed
+control with no explanation is a bug report and an enabled one that quietly opens
+*some other* conversation is worse.
+
+**Where it opens.** With herdr installed, `pane split --cwd <dir>` then
+`agent start --kind <harness> --pane <pane>`, which waits for the agent to become
+interactive. The new pane is at the session's own directory, and the split goes
+wherever your focus is - herdr's own behaviour, and the alternative (jumping you
+to a random workspace) would be worse.
+
+A new pane is not at a shell prompt the instant it exists, and herdr refuses to
+start an agent in a pane that is not sitting at one, so the launch retries on
+that one error code until the shell catches up. There is no readiness field to
+poll - `pane get` reports nothing for a bare shell - so herdr's refusal is the
+signal.
+
+**Without herdr** there is no addressable terminal, so the fallback opens a new
+one: `x-terminal-emulator`, `gnome-terminal`, `konsole`, `alacritty`, `kitty`,
+`wezterm`, `foot` or `xterm`, first on PATH wins; on macOS, AppleScript into
+Terminal or iTerm. If neither herdr nor a terminal can be found, the button says
+which was missing. On **Windows without herdr** it says so and stops - the only
+remaining option would be shelling out to `wt.exe` from inside WSL, which is not
+implemented because it could not be tested from the machine it was written on.
+
+Settings → *Run again* controls the launch target, whether the new pane is
+focused, and how long to wait for the agent.
+
+## Settings
+
+A gear in the panel header, next to the live and finished tabs. It is not on the
+pill: the pill's four buttons sit in a 2x2 that 80px of height cannot grow, and a
+fifth icon is a worse answer than one more click.
+
+![The settings popover, open over the finished tab](docs/settings.png)
+
+The controls are grouped by **when the value takes effect**, because that is the
+thing you cannot otherwise see:
+
+| Group | Settings | Applies |
+|---|---|---|
+| Run again | launch target, focus the new pane, wait up to | immediately |
+| Notifications | mute, stay quiet while the panel is focused | immediately |
+| Data & refresh | refresh interval, finished-row cap, enabled harnesses | **on restart** |
+| Appearance | theme, widget shape, which tab opens first | immediately |
+
+The restart-gated group is marked in its heading, and a note at the bottom appears
+only once you have actually changed one of them.
+
+**Two stores, on purpose.** Appearance is read synchronously while the store is
+created, because a floating widget is on screen before any IPC has resolved and
+getting it wrong means a visible flash of the wrong theme. Those three live in
+`localStorage`. Everything the *running pipeline* reads - including the scan
+settings the WSL agent is started with - lives in one `settings.json`. The rule
+is whether the **first render** or the **running pipeline** needs the value.
+
+`settings.json` is read and written only by the UI process. On Windows the
+scanner is a separate process inside WSL, so anything it needs is handed over as
+a command-line argument when the UI spawns it:
+
+```
+harness-monitor-agent --agent --interval-ms 3000 --max-ended 250 --harnesses claude-code,codex
+```
+
+and the same for the one-shot that reopens a session:
+
+```
+harness-monitor-agent --run-again <harness> <session-id> <cwd> --rerun-target auto --rerun-focus
+```
+
+That is why scan settings need a restart and everything else does not, and why
+there is no control channel into the agent.
+
+A file that is missing, truncated, or written by a future version falls back to
+the defaults rather than stopping the app, and every numeric value is clamped -
+`interval_ms: 0` would otherwise have the scanner spinning a core with no pause.
+
+**Mute now survives a restart**, which it did not before: it lived in an
+`AtomicBool` and came back unmuted every time.
+
 ## Notification rules
 
 Noise control is most of the work:
@@ -242,7 +433,7 @@ Noise control is most of the work:
 | Cooldown | 30 s per session, absorbing the busy↔idle flapping between tool calls |
 | Repeat guard | A second "needs you" for the same reason within 5 minutes is dropped |
 | Global cap | 3 toasts per 10 s; the rest collapse into one summary |
-| Ghosts | A session that fails the liveness check is forgotten silently - a deleted state file is not a completed turn |
+| Ghosts | A session that fails the liveness check never enters the notification pipeline at all - a deleted state file is not a completed turn |
 
 ## Usage numbers
 
@@ -296,7 +487,7 @@ bun install
 bun run build
 
 cd src-tauri
-cargo test                 # 28 tests, no GUI needed
+cargo test                 # 218 tests, no GUI needed
 cargo run                  # runs the app against your real sessions
 cargo run -- --agent       # NDJSON snapshots on stdout
 ```
@@ -364,17 +555,22 @@ the distro comes from `HM_WSL_DISTRO`, else the first entry of `wsl.exe -l -q`.
 To review the UI without a desktop (or to check both themes at once):
 
 ```bash
-./scripts/preview.sh 420 700 preview.png          # light, expanded
+./scripts/preview.sh 440 620 preview.png          # light, expanded
+./scripts/preview.sh 440 620 preview.png theme=dark
+./scripts/preview.sh 440 620 preview.png view=finished settings=1
 ```
 
 It builds, serves the built assets, and screenshots through headless Chrome.
-Two things it works around, both of which silently produce a wrong picture:
-`vite dev` never sees edits under `/mnt/c` (inotify does not fire on drvfs), and
-Chrome enforces a ~500px minimum window width, so a 420px screenshot would
-otherwise be a crop of a 512px layout. Append `?theme=dark`, `?collapsed`, or
-`?w=<px>` to the preview URL. Opened in a plain browser the app renders fixture
-data covering every state, since real sessions are rarely all interesting at
-once.
+Three things it works around, all of which silently produce a wrong picture:
+`vite dev` never sees edits under `/mnt/c` (inotify does not fire on drvfs);
+Chrome enforces a ~500px minimum window width, so a 440px widget would otherwise
+be a crop of a 512px layout; and because of that same minimum the raw
+screenshot carries a dead margin down the right, so the last step crops it back
+to the size you asked for. Anything after the three arguments becomes a query
+param, one per argument - `theme=dark`, `collapsed`, `shape=vertical`,
+`view=finished`, `q=api`, `dates=today`, `many=12`, `settings=1`, `only=idle`.
+Opened in a plain browser the app renders fixture data covering every state,
+since real sessions are rarely all interesting at once.
 
 ## Why not one of the others
 
@@ -420,19 +616,27 @@ one place.
 
   If nothing appears, sessions are still tracked in the window - the app says
   which path it is using at startup rather than failing silently.
+- **On a Linux host with no D-Bus session bus, a second copy exits silently.**
+  The usual single-instance handshake rides on a D-Bus name there, and a stock
+  WSL may not have a bus at all. Rather than let that panic at startup, the app
+  falls back to a pid lock file in its state dir, which still stops the second
+  copy - but there is no channel back to the first process, so the window is
+  not raised. Use the tray icon to show it. A lock left by a crash is detected
+  and reclaimed on the next launch.
 - The Windows release build has no console. Set `HM_LOG_FILE` to a writable
   path to get a log (`frontend connected`, `starting wsl agent`, snapshot
   counts); that is the fastest way to tell a webview problem from a bridge
   problem.
 - Always-on-top under WSLg is best-effort - WSLg composites X/Wayland windows
   into the Windows desktop and does not reliably honour the hint.
-- **On macOS, dead sessions are not filtered.** Liveness is a `procStart`
-  comparison against `/proc/<pid>/stat`, which macOS does not have, so every
-  pid comes back `Unknown` and stale `~/.claude/sessions` files - ones frozen
-  in `status:"busy"` months ago - still show in the pill. Fixing it needs a
-  `sysctl(KERN_PROC_PID)` implementation plus knowledge of what Claude Code
-  writes into `procStart` on macOS; until then the app keeps ghosts rather than
-  risk dropping live sessions.
+- **On macOS, liveness cannot be established.** The check is a `procStart`
+  comparison against `/proc/<pid>/stat`, which macOS does not have, so every pid
+  comes back `Unknown`. An unverifiable session is filed as finished rather than
+  shown as live - it never reaches the pill's counts or the differ - but that
+  means the live list is empty on a Mac where Claude Code is running. Fixing it
+  needs a `sysctl(KERN_PROC_PID)` implementation, and before that, knowledge of
+  what Claude Code writes into `procStart` there: the Linux value is kernel
+  ticks since boot and cannot be it.
 - **Antigravity is unavailable on macOS.** Its root is found by scanning
   `/mnt/c/Users` for a Windows home, which only exists under WSL.
 - macOS builds are unsigned and not smoke-tested per release. Gatekeeper blocks

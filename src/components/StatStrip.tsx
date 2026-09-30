@@ -31,7 +31,7 @@ export function StatStrip({
         label="running"
         short="running"
         wide={vertical}
-        tone="text-sky-700 dark:text-sky-300"
+        tone="text-black/80 dark:text-white/80"
       >
         <path d="M2 1.2 8.4 5 2 8.8Z" />
       </Stat>
@@ -40,7 +40,7 @@ export function StatStrip({
         label="idle"
         short="idle"
         wide={vertical}
-        tone="text-indigo-900/55 dark:text-indigo-200/55"
+        tone="text-black/45 dark:text-white/45"
       >
         <rect x="2.4" y="2.4" width="1.7" height="5.2" rx="0.8" />
         <rect x="5.9" y="2.4" width="1.7" height="5.2" rx="0.8" />
@@ -50,8 +50,12 @@ export function StatStrip({
         label="waiting for you"
         short="waiting"
         wide={vertical}
-        tone="text-amber-700 dark:text-amber-300"
+        tone="text-black dark:text-white"
         pulse={waiting > 0}
+        // The one chip on the pill allowed to be a solid stamp of ink: nothing
+        // else in the widget is, so a waiting count reads as a stop sign from
+        // across the desk.
+        loud={waiting > 0}
       >
         <rect x="4.1" y="1" width="1.8" height="5" rx="0.9" />
         <circle cx="5" cy="8.2" r="1.05" />
@@ -66,6 +70,7 @@ function Stat({
   short,
   tone,
   pulse,
+  loud,
   wide,
   children,
 }: {
@@ -75,19 +80,23 @@ function Stat({
   short: string;
   tone: string;
   pulse?: boolean;
+  /** Solid ink: reserved for a count that is waiting on you. */
+  loud?: boolean;
   /** Vertical strip: stretch the chip and push the number to the right edge. */
   wide?: boolean;
   children: React.ReactNode;
 }) {
+  const skin = loud
+    ? "bg-black text-white ring-black dark:bg-white dark:text-black dark:ring-white"
+    : `bg-black/[0.06] ring-1 ring-inset ring-black/10 dark:bg-white/[0.07] dark:ring-white/10 ${tone}`;
+
   return (
     <span
       data-tauri-drag-region
       title={`${value} ${label}`}
-      // Glass, like every other chip on the pill: the surface underneath is
-      // already carrying colour, so a second filled colour reads as noise.
-      className={`flex items-center gap-1 rounded-md bg-indigo-950/[0.06] px-1.5 py-px text-[10px] font-semibold tabular-nums ring-1 ring-inset ring-indigo-950/10 dark:bg-white/[0.07] dark:ring-white/10 ${tone} ${value === 0 ? "opacity-40" : ""} ${
-        wide ? "justify-between" : ""
-      }`}
+      className={`flex items-center gap-1 rounded-md px-1.5 py-px text-[10px] font-semibold tabular-nums ${skin} ${
+        value === 0 ? "opacity-40" : ""
+      } ${wide ? "justify-between" : ""}`}
     >
       {/* Glyph and label travel together on the left; the number stays hard
           right so the three rows read as a column of figures. A bare icon plus

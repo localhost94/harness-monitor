@@ -268,7 +268,9 @@ fn render(kind: NotifyKind, session: &AgentSession) -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{FidelityTier, HarnessId};
+    use crate::liveness::Liveness;
+    use crate::model::FidelityTier;
+    use crate::model::HarnessId;
     use std::path::PathBuf;
 
     fn session(pid: i64, state: SessionState, changed_at: i64) -> AgentSession {
@@ -297,6 +299,7 @@ mod tests {
             tier: FidelityTier::Full,
             jump_target: None,
             terminal_title: None,
+            liveness: Liveness::Alive,
         }
     }
 
@@ -305,6 +308,7 @@ mod tests {
             taken_at: 0,
             detected: vec![HarnessId::ClaudeCode],
             sessions,
+            ended: Vec::new(),
             quota: None,
             reseed: false,
         }
@@ -327,7 +331,10 @@ mod tests {
         let out = d.ingest(&snap(vec![session(1, SessionState::Idle, 200)]), 2_000);
         assert!(matches!(
             out.as_slice(),
-            [Outgoing::One { kind: NotifyKind::Done, .. }]
+            [Outgoing::One {
+                kind: NotifyKind::Done,
+                ..
+            }]
         ));
 
         // Re-reading the same file must not fire again.
@@ -399,9 +406,13 @@ mod tests {
     #[test]
     fn global_cap_coalesces_the_rest() {
         let mut d = Differ::new(DifferConfig::default());
-        let running: Vec<_> = (0..6).map(|i| session(i, SessionState::Running, 100)).collect();
+        let running: Vec<_> = (0..6)
+            .map(|i| session(i, SessionState::Running, 100))
+            .collect();
         d.ingest(&snap(running), 1_000);
-        let done: Vec<_> = (0..6).map(|i| session(i, SessionState::Idle, 200)).collect();
+        let done: Vec<_> = (0..6)
+            .map(|i| session(i, SessionState::Idle, 200))
+            .collect();
         let out = d.ingest(&snap(done), 2_000);
         assert_eq!(out.len(), 4); // 3 individual + 1 summary
         assert_eq!(out[3], Outgoing::Coalesced { count: 3 });
@@ -442,5 +453,50 @@ mod tests {
         bg.state = SessionState::Idle;
         bg.state_changed_at = 200;
         assert_eq!(d.ingest(&snap(vec![bg]), 2_000), vec![]);
+    }
+
+    /// The reason `Snapshot` has two session lists instead of one: a session
+    /// that ended is history, and history must never be diffed. If this test
+    /// ever needs changing, the ended list has started reaching the differ.
+    #[test]
+    fn ended_sessions_are_invisible_to_the_differ() {
+        let mut d = Differ::new(DifferConfig::default());
+        d.ingest(&snap(vec![session(1, SessionState::Running, 100)]), 1_000);
+
+        // A dead pid, frozen at whatever status it died holding. Left in the
+        // live list this reads as a turn that just finished.
+        let mut dead = session(2, SessionState::Ended, 200);
+        dead.liveness = Liveness::Dead;
+        let mut snapshot = snap(vec![]);
+        snapshot.ended = vec![dead];
+        assert_eq!(d.ingest(&snapshot, 2_000), vec![]);
+        assert_eq!(d.tracked_len(), 0);
+    }
+
+    /// A session can appear in both lists for a tick: the ended list is
+    /// refreshed on its own cadence, so a session that just went stale is still
+    /// in the cached copy while the live scan has already dropped it. Reading
+    /// both would either double-notify or fire on a session that is over.
+    #[test]
+    fn a_session_in_both_lists_fires_once() {
+        let mut d = Differ::new(DifferConfig::default());
+        d.ingest(&snap(vec![session(1, SessionState::Running, 100)]), 1_000);
+
+        let mut finished = session(1, SessionState::Idle, 200);
+        finished.liveness = Liveness::Dead;
+        let mut snapshot = snap(vec![session(1, SessionState::Idle, 200)]);
+        snapshot.ended = vec![finished];
+
+        let out = d.ingest(&snapshot, 2_000);
+        assert!(
+            matches!(
+                out.as_slice(),
+                [Outgoing::One {
+                    kind: NotifyKind::Done,
+                    ..
+                }]
+            ),
+            "expected one completion, got {out:?}"
+        );
     }
 }

@@ -9,6 +9,13 @@ harness-monitor-agent
 hm.log
 preview*.png
 winagent.txt
+/.preview/
 
 .env
 .env.*
+
+# Test coverage output
+/coverage/
+/src-tauri/coverage-llvm.json
+/src-tauri/coverage-lcov.info
+/src-tauri/target/llvm-cov-target/

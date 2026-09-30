@@ -1,23 +1,27 @@
 //! Liveness for harness-reported pids.
 //!
 //! ~/.claude/sessions holds one file per CLI process and nothing ever cleans
-//! them up: on this machine 23 files, 2 live, with dead ones frozen in
-//! `status:"busy"` or `waitingFor:"permission prompt"` for months. Showing
-//! those - or worse, diffing them - is the single largest correctness risk in
-//! the app, so dead entries are dropped before they ever reach the differ.
+//! them up: on this machine 61 files, 5 live, with dead ones frozen in
+//! `status:"busy"` or `waitingFor:"permission prompt"` for months. Diffing
+//! those is the single largest correctness risk in the app, so a dead pid never
+//! reaches the differ - it is filed as `Snapshot::ended` instead, which the
+//! differ does not read. That keeps "what did I run" answerable without putting
+//! a months-old `busy` one notification away from firing.
 //!
 //! The check is `procStart` (the kernel's starttime for that pid) against
 //! /proc/<pid>/stat field 22. Comparing pid alone is not enough: pids are
 //! recycled. Matching on process *name* is wrong too - a live Claude Code
 //! process has comm "2.1.259", not "claude".
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Liveness {
     Alive,
     Dead,
     /// Cannot be determined on this host (e.g. a Linux pid seen from Windows,
     /// which lives in a different pid namespace entirely, or macOS, which has
     /// no procfs and no implementation here yet - see the `not(linux)` arm).
+    #[default]
     Unknown,
 }
 
@@ -60,7 +64,8 @@ mod tests {
 
     #[test]
     fn parses_starttime_field() {
-        let raw = "1028 (claude) S 1 1028 1028 0 -1 4194304 1 2 3 4 5 6 7 8 20 0 1 0 1519205 123 456";
+        let raw =
+            "1028 (claude) S 1 1028 1028 0 -1 4194304 1 2 3 4 5 6 7 8 20 0 1 0 1519205 123 456";
         assert_eq!(parse_start_time(raw).as_deref(), Some("1519205"));
     }
 

@@ -5,14 +5,17 @@ import { clockTime, dayAndTime, duration, untilReset } from "../lib/format";
  * Both plan windows, each as a ring plus the wall-clock time it resets.
  *
  * The percentages are mirrored from the harness and never derived from token
- * counts. When the reading goes stale the whole block greys out and says how
- * old it is, rather than being extrapolated forward.
+ * counts. With the hue gone, pressure is shown by weight instead: a low
+ * reading is a thin arc, a middling one a heavier one, and a window nearly
+ * spent a third heavier still. When the reading goes stale the whole block
+ * greys out and says how old it is, rather than being extrapolated forward.
  */
 export function Quota({
   quota,
   now,
   tone,
   stack,
+  inline,
   pending,
 }: {
   quota: QuotaSnapshot | null;
@@ -20,6 +23,9 @@ export function Quota({
   tone: { title: string; sub: string };
   /** Vertical strip: stack the two windows instead of sitting them side by side. */
   stack?: boolean;
+  /** One-line bar: shrink the rings and drop the reset clock, which only the
+      tooltip has room for at this height. */
+  inline?: boolean;
   /** No snapshot has arrived yet - not the same as "no quota exists". */
   pending?: boolean;
 }) {
@@ -69,6 +75,7 @@ export function Quota({
         stale={stale}
         staleAge={stale ? duration(quota.at, now) : null}
         source={quota.source}
+        inline={inline}
       />
       {quota.seven_day_pct !== null && (
         <Window
@@ -80,6 +87,7 @@ export function Quota({
           stale={stale}
           staleAge={stale ? duration(quota.at, now) : null}
           source={quota.source}
+          inline={inline}
         />
       )}
     </div>
@@ -95,6 +103,7 @@ function Window({
   stale,
   staleAge,
   source,
+  inline,
 }: {
   label: string;
   pct: number;
@@ -104,16 +113,22 @@ function Window({
   stale: boolean;
   staleAge: string | null;
   source: string;
+  inline?: boolean;
 }) {
   const pct = Math.min(100, Math.max(0, raw));
+  const spent = pct > 85;
+  // Three weights, not three colours: thin arc for plenty left, medium for the
+  // middle, full ink and a heavier stroke for a window that is nearly gone.
   const stroke = stale
-    ? "stroke-zinc-400/70"
-    : pct > 85
-      ? "stroke-rose-400"
+    ? "stroke-black/30 dark:stroke-white/25"
+    : spent
+      ? "stroke-black dark:stroke-white"
       : pct > 60
-        ? "stroke-amber-300"
-        : "stroke-emerald-300";
-  const r = 11;
+        ? "stroke-black/80 dark:stroke-white/80"
+        : "stroke-black/50 dark:stroke-white/50";
+  // 30px leaves no room for a second line of text at one-line height, so the
+  // ring shrinks rather than the label wrapping or the bar growing.
+  const r = inline ? 9 : 11;
   const circumference = 2 * Math.PI * r;
 
   return (
@@ -123,25 +138,29 @@ function Window({
         staleAge
           ? `Claude plan, ${label} window: ${pct.toFixed(0)}% used as of ${staleAge} ago — the source went quiet`
           : `Claude plan, ${label} window: ${pct.toFixed(0)}% used${
-              left ? `, ${left} left` : ""
-            } (from ${source}). Other harnesses have no plan window; their usage shows per session.`
+              resetsAt ? `, resets ${resetsAt}` : ""
+            }${left ? `, ${left} left` : ""} (from ${source}). Other harnesses have no plan window; their usage shows per session.`
       }
     >
-      <div className="relative flex h-[30px] w-[30px] shrink-0 items-center justify-center">
+      <div
+        className={`relative flex shrink-0 items-center justify-center ${
+          inline ? "h-[24px] w-[24px]" : "h-[30px] w-[30px]"
+        }`}
+      >
         <svg viewBox="0 0 30 30" className="absolute inset-0 -rotate-90">
           <circle
             cx="15"
             cy="15"
             r={r}
-            className="fill-none stroke-current opacity-20"
-            strokeWidth="3.5"
+            className="fill-none stroke-current opacity-[0.12]"
+            strokeWidth={inline ? 4 : 3.5}
           />
           <circle
             cx="15"
             cy="15"
             r={r}
             className={`fill-none ${stroke}`}
-            strokeWidth="3.5"
+            strokeWidth={inline ? 4 : spent && !stale ? 5 : 3.5}
             strokeLinecap="round"
             strokeDasharray={`${(circumference * pct) / 100} ${circumference}`}
           />
@@ -154,7 +173,10 @@ function Window({
         <span className={`whitespace-nowrap text-[9px] font-semibold tabular-nums ${tone.title}`}>
           {label} {pct.toFixed(0)}%
         </span>
-        {resetsAt && (
+        {/* The reset clock is the first thing to go in a 44px strip: it is the
+            same fact the tooltip above carries, and the expanded list shows it
+            at full size. */}
+        {resetsAt && !inline && (
           <span className={`whitespace-nowrap text-[9px] tabular-nums ${tone.sub}`}>
             ↻ {resetsAt}
           </span>

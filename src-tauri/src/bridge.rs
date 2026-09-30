@@ -12,16 +12,33 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
-use crate::model::Snapshot;
+use crate::adapters;
+use crate::model::{HarnessId, Snapshot};
 use crate::scanner::Scanner;
 
 /// Plain threads and a std channel on purpose: the pipeline is a slow poll
 /// loop over blocking filesystem reads, and putting it on Tauri's async
 /// runtime bought nothing but a scheduler to be wrong about.
-pub fn spawn_source(tx: Sender<Snapshot>, interval_ms: u64) {
+///
+/// The scan settings are parameters rather than something read from disk in
+/// here, because on Windows the caller is on the other side of WSL and there is
+/// no settings file this process could reach. That is also why changing them
+/// needs a restart of the app: they are fixed at spawn.
+pub fn spawn_source(
+    tx: Sender<Snapshot>,
+    interval_ms: u64,
+    enabled: &[HarnessId],
+    max_ended: usize,
+) {
+    let enabled: Vec<String> = enabled
+        .iter()
+        .filter_map(|h| serde_json::to_value(h).ok())
+        .filter_map(|v| v.as_str().map(str::to_string))
+        .collect();
     if cfg!(windows) {
-        std::thread::spawn(move || run_wsl_agent(tx, interval_ms));
+        std::thread::spawn(move || run_wsl_agent(tx, interval_ms, enabled, max_ended));
     } else {
+        adapters::configure(max_ended, &enabled);
         std::thread::spawn(move || run_local(tx, interval_ms));
     };
 }
@@ -38,7 +55,7 @@ fn run_local(tx: Sender<Snapshot>, interval_ms: u64) {
     }
 }
 
-fn run_wsl_agent(tx: Sender<Snapshot>, interval_ms: u64) {
+fn run_wsl_agent(tx: Sender<Snapshot>, interval_ms: u64, enabled: Vec<String>, max_ended: usize) {
     let mut backoff_ms = 500u64;
     loop {
         let cfg = WslConfig::resolve();
@@ -46,8 +63,17 @@ fn run_wsl_agent(tx: Sender<Snapshot>, interval_ms: u64) {
 
         let mut command = std::process::Command::new("wsl.exe");
         command
-            .args(["-d", &cfg.distro, "--", &cfg.agent_path, "--agent", "--interval-ms"])
+            .args([
+                "-d",
+                &cfg.distro,
+                "--",
+                &cfg.agent_path,
+                "--agent",
+                "--interval-ms",
+            ])
             .arg(interval_ms.to_string())
+            .args(["--max-ended", &max_ended.to_string()])
+            .args(["--harnesses", &enabled.join(",")])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null());
         hide_console(&mut command);
@@ -88,19 +114,64 @@ fn run_wsl_agent(tx: Sender<Snapshot>, interval_ms: u64) {
 
 /// One-shot: ask the WSL-side copy of this binary to focus a pane.
 pub fn focus_via_wsl(target: &str) -> Result<(), String> {
+    run_wsl_one_shot(&["--focus", target])
+}
+
+/// One-shot: ask the WSL-side copy of this binary to reopen a session.
+///
+/// The resume options travel as arguments for the same reason they exist on the
+/// command line at all: the settings file lives in the Windows user's AppData,
+/// which the process inside WSL has no reason to be able to read. `hide_console`
+/// matters more here than for `--focus` - this one can spawn a terminal.
+pub fn run_again_via_wsl(
+    harness: &str,
+    session_id: &str,
+    cwd: &str,
+    target: &str,
+    focus: bool,
+    timeout_ms: u64,
+) -> Result<(), String> {
+    let focus_flag = if focus {
+        "--rerun-focus"
+    } else {
+        "--no-rerun-focus"
+    };
+    let timeout = timeout_ms.to_string();
+    run_wsl_one_shot(&[
+        "--run-again",
+        harness,
+        session_id,
+        cwd,
+        "--rerun-target",
+        target,
+        focus_flag,
+        "--rerun-timeout-ms",
+        &timeout,
+    ])
+}
+
+/// `wsl.exe -d <distro> -- <binary> <args>`, waiting for it to finish.
+fn run_wsl_one_shot(args: &[&str]) -> Result<(), String> {
     let cfg = WslConfig::resolve();
     let mut command = std::process::Command::new("wsl.exe");
-    command.args(["-d", &cfg.distro, "--", &cfg.agent_path, "--focus", target]);
+    command
+        .args(["-d", &cfg.distro, "--", &cfg.agent_path])
+        .args(args);
     hide_console(&mut command);
-    let output = command.output().map_err(|e| format!("spawning wsl.exe: {e}"))?;
+    let output = command
+        .output()
+        .map_err(|e| format!("spawning wsl.exe: {e}"))?;
     if output.status.success() {
         return Ok(());
     }
-    Err(String::from_utf8_lossy(&output.stderr)
-        .trim()
-        .chars()
-        .take(200)
-        .collect())
+    // The WSL-side binary writes the reason to stderr before exiting 1, so this
+    // is the actual failure rather than a bare non-zero status.
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = stderr.trim();
+    if stderr.is_empty() {
+        return Err("the WSL-side agent exited without saying why".to_string());
+    }
+    Err(stderr.chars().take(200).collect())
 }
 
 #[derive(Debug, Clone)]
@@ -198,5 +269,35 @@ mod tests {
     fn rejects_non_drive_paths() {
         assert_eq!(windows_path_to_wsl(Path::new(r"\\server\share\x")), None);
         assert_eq!(windows_path_to_wsl(Path::new("/already/linux")), None);
+    }
+
+    #[test]
+    fn the_agent_hint_is_a_sibling_of_the_running_binary() {
+        // The UI process ships next to the agent it has to launch inside WSL,
+        // and the name is what the release workflow produces.
+        let hint = agent_binary_hint();
+        assert_eq!(hint.file_name().unwrap(), "harness-monitor-agent");
+        // Never the UI binary itself: spawning that with --agent would open a
+        // second window instead of streaming snapshots.
+        assert_ne!(hint, std::env::current_exe().unwrap_or_default());
+    }
+
+    #[test]
+    fn a_lowercase_drive_letter_is_translated_too() {
+        // Explorer produces `c:\`, not `C:\`, when a path is copied.
+        assert_eq!(
+            windows_path_to_wsl(Path::new(r"c:\code\agent")).as_deref(),
+            Some("/mnt/c/code/agent")
+        );
+    }
+
+    #[test]
+    fn a_bare_drive_root_keeps_its_trailing_separator() {
+        // The separator survives, so the result is still a directory and not a
+        // file that happens to be named like one.
+        assert_eq!(
+            windows_path_to_wsl(Path::new(r"C:\")).as_deref(),
+            Some("/mnt/c/")
+        );
     }
 }

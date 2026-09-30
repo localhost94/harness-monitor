@@ -1,5 +1,5 @@
-//! herdr integration - optional, and the only thing that makes "jump to that
-//! session" possible on this machine.
+//! herdr integration - optional, and the thing that makes both "jump to that
+//! session" and "run that session again" possible on this machine.
 //!
 //! herdr is a terminal workspace manager for AI coding agents. Its panes
 //! already know which agent session they host (Claude Code's own hook reports
@@ -8,8 +8,12 @@
 //! we map session id -> pane id through `herdr agent list` and then call
 //! `herdr agent focus <pane>`.
 //!
-//! Everything here degrades to None: without herdr the app simply offers no
-//! jump.
+//! `pane split` and `agent start` are the other half: they let us open a pane
+//! at a given directory and start a harness in it, which is how a finished
+//! session gets reopened (`rerun.rs`). Same binary, same mapping.
+//!
+//! Everything here degrades to None: without herdr the app offers no jump, and
+//! `rerun.rs` falls back to opening a terminal itself.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -95,7 +99,9 @@ pub fn locations() -> HashMap<String, Location> {
     };
 
     for agent in list.agents {
-        let Some(pane_id) = agent.pane_id else { continue };
+        let Some(pane_id) = agent.pane_id else {
+            continue;
+        };
         let Some(session) = agent.agent_session.and_then(|s| s.value) else {
             continue;
         };

@@ -16,11 +16,15 @@ export function UsagePager({
   now,
   tone,
   stack,
+  inline,
 }: {
   snapshot: Snapshot | null;
   now: number;
   tone: { title: string; sub: string };
   stack?: boolean;
+  /** One-line bar: one row instead of a stacked column. Everything else
+      stays - the harness code is what makes the arrows mean anything. */
+  inline?: boolean;
 }) {
   const { usageHarness, cycleUsage } = useMonitor();
   const available = snapshot?.detected ?? [];
@@ -29,7 +33,7 @@ export function UsagePager({
     : (available[0] ?? "claude-code");
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className={`flex gap-1 ${inline ? "items-center" : "flex-col gap-0.5"}`}>
       <div className="flex items-center gap-0.5">
         <Chevron
           direction="prev"
@@ -60,10 +64,11 @@ export function UsagePager({
           now={now}
           tone={tone}
           stack={stack}
+          inline={inline}
           pending={!snapshot}
         />
       ) : (
-        <HarnessUsage snapshot={snapshot} harness={harness} tone={tone} />
+        <HarnessUsage snapshot={snapshot} harness={harness} tone={tone} inline={inline} />
       )}
     </div>
   );
@@ -73,10 +78,12 @@ function HarnessUsage({
   snapshot,
   harness,
   tone,
+  inline,
 }: {
   snapshot: Snapshot | null;
   harness: HarnessId;
   tone: { title: string; sub: string };
+  inline?: boolean;
 }) {
   const sessions = (snapshot?.sessions ?? []).filter((s) => s.key.harness === harness);
   let tokens = 0;
@@ -92,6 +99,7 @@ function HarnessUsage({
     );
   }
 
+
   const breakdown = sessions
     .filter((s) => s.tokens)
     .map((s) => `${s.name ?? s.session_id.slice(0, 8)}: ${tokenBreakdown(s.tokens!)}`)
@@ -101,7 +109,7 @@ function HarnessUsage({
     <div
       data-tauri-drag-region
       title={breakdown || `${sessions.length} session(s)`}
-      className="flex flex-col leading-tight"
+      className={`flex leading-tight ${inline ? "flex-row items-center gap-1.5" : "flex-col"}`}
     >
       {/* Three cases, and never the same fact twice: tokens over cost, tokens
           over a session count, or - for a harness that reports neither - the
@@ -136,7 +144,7 @@ function Chevron({
       onClick={onClick}
       disabled={disabled}
       title={direction === "prev" ? "Previous harness" : "Next harness"}
-      className={`rounded p-px transition hover:bg-indigo-950/10 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-white/10 ${tone}`}
+      className={`rounded p-px transition hover:bg-black/10 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-white/10 ${tone}`}
     >
       <svg
         viewBox="0 0 10 10"

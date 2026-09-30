@@ -1,0 +1,45 @@
+# Two reports, one project. Codecov merges them per commit, so the badge is the
+# combined number; the flags are here so a half-uploaded run is visible as one
+# missing report rather than an unexplained dip.
+#
+# The thresholds are `auto` on purpose: this reports coverage, it does not
+# enforce it. A hard patch target would turn "someone added a module" into a
+# red build for whoever has to write the tests, which is a decision to make
+# deliberately rather than inherit from a config file.
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: auto
+
+flags:
+  frontend:
+    paths:
+      - src
+    carryforward: true
+  backend:
+    paths:
+      - src-tauri/src
+      - src-tauri/tests
+    carryforward: true
+
+# Reachable only from a running app, or by spawning a process: the CLI entry
+# point, the desktop-portal notification bridge, the single-instance plugin and
+# the `--agent` poll loop. Excluding them keeps the report about the parts a
+# test can actually drive, rather than being dominated by code nothing can reach
+# headlessly. Everything else stays in, including code that is currently
+# untested - the number should be the real one.
+ignore:
+  - "src-tauri/src/main.rs"
+  - "src-tauri/src/notify_out.rs"
+  - "src-tauri/src/single_instance.rs"
+  - "src-tauri/src/agent.rs"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true

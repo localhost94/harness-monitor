@@ -22,10 +22,19 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Build frontend
-        run: |
-          bun install --frozen-lockfile
-          bun run build
+        run: bun run build
+      # Coverage is uploaded from the Linux job only. Two runners reporting the
+      # same Rust numbers would race, and the macOS job exists to compile the
+      # cfg(target_os = "macos") branches, not to measure coverage.
+      #
+      # This is the only frontend run here: `test:coverage` is the same suite
+      # with instrumentation, so a second pass would double the wait to learn
+      # nothing new. It exits non-zero on failure, so it is also the gate.
+      - name: Test frontend
+        run: bun run test:coverage
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -34,13 +43,43 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Test
+      # Instrumenting the test binaries needs the LLVM coverage runtime from the
+      # rustup component, which the toolchain does not include by default.
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      # Also the test run: llvm-cov builds the same targets with coverage
+      # instrumentation, prints the test results, and exits non-zero if any
+      # test fails. A plain `cargo test` alongside it would rebuild everything
+      # a second time for a signal this step already gives.
+      - name: Test with coverage
         working-directory: src-tauri
-        run: cargo test --all-targets
+        run: cargo llvm-cov --all-targets --lcov --output-path coverage-lcov.info
 
       - name: Clippy
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
+
+      # Two reports, one project: Codecov merges them per-commit, so the badge
+      # is the combined number. `fail_ci_if_error: false` because an upload
+      # outage is not a reason to fail a commit whose tests passed.
+      - name: Upload frontend coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/coverage-final.json
+          flags: frontend
+          name: frontend
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload backend coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./src-tauri/coverage-lcov.info
+          flags: backend
+          name: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   # Nothing on a Linux box can compile-check the cfg(target_os = "macos")
   # branches - there is no macOS SDK to cross-check against - so the only way
@@ -53,10 +92,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Build frontend
-        run: |
-          bun install --frozen-lockfile
-          bun run build
+        run: bun run build
+      # The frontend suite runs here too, without coverage: `format.stamp` and
+      # `search.windowStart` read the machine timezone and locale, so a green
+      # Linux run says nothing about whether macOS agrees.
+      - name: Test frontend
+        run: bun run test
 
       - uses: dtolnay/rust-toolchain@stable
         with:

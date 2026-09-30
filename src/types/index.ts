@@ -11,7 +11,18 @@ export type SessionState =
   | "awaiting-permission"
   | "idle"
   | "shell"
-  | "active-unknown";
+  | "active-unknown"
+  /** Over: the process is gone, or the row fell outside its recency window. */
+  | "ended";
+
+/**
+ * Whether the process behind a session is still running.
+ *
+ * `unknown` is not a synonym for alive - on a host with no procfs nothing can
+ * be checked, and such a session is listed as ended rather than shown as live,
+ * because "cannot be disproved" is not evidence.
+ */
+export type Liveness = "alive" | "dead" | "unknown";
 
 export type FidelityTier = "full" | "usage-only" | "presence-only";
 
@@ -48,6 +59,7 @@ export interface AgentSession {
   jump_target: string | null;
   /** Terminal tab title - the fastest way for a human to recognise the window. */
   terminal_title: string | null;
+  liveness: Liveness;
 }
 
 export interface QuotaSnapshot {
@@ -63,7 +75,13 @@ export interface QuotaSnapshot {
 export interface Snapshot {
   taken_at: number;
   detected: HarnessId[];
+  /** Confirmed-alive sessions, plus any whose liveness this host cannot check. */
   sessions: AgentSession[];
+  /**
+   * Sessions this machine can see that are no longer running. Display-only:
+   * the backend never feeds these to the differ, so nothing here can notify.
+   */
+  ended: AgentSession[];
   quota: QuotaSnapshot | null;
   reseed: boolean;
 }
@@ -78,38 +96,21 @@ export const HARNESS_CODE: Record<HarnessId, string> = {
   antigravity: "AG",
 };
 
-/// One hue per harness, deliberately outside the state palette (amber =
-/// needs you, sky = running, zinc = idle) so the two never read as the same
-/// signal.
-export const HARNESS_CHIP: Record<HarnessId, string> = {
-  "claude-code":
-    "bg-orange-100 text-orange-700 ring-orange-300 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-400/30",
-  "open-code":
-    "bg-emerald-100 text-emerald-700 ring-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30",
-  codex:
-    "bg-violet-100 text-violet-700 ring-violet-300 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30",
-  gemini:
-    "bg-blue-100 text-blue-700 ring-blue-300 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-400/30",
-  antigravity:
-    "bg-fuchsia-100 text-fuchsia-700 ring-fuchsia-300 dark:bg-fuchsia-500/15 dark:text-fuchsia-300 dark:ring-fuchsia-400/30",
-};
+/// The interface has no hue left to spend, so the two letters are the whole
+/// of a harness's identity: one chip style for all of them, and the code is
+/// what tells you which agent you are looking at.
+export const HARNESS_CHIP =
+  "bg-black/[0.06] text-black/80 ring-1 ring-inset ring-black/15 dark:bg-white/[0.08] dark:text-white/85 dark:ring-white/20";
 
-/** Solid dot colour - used where the chip itself must stay translucent. */
-export const HARNESS_DOT: Record<HarnessId, string> = {
-  "claude-code": "bg-orange-400",
-  "open-code": "bg-emerald-400",
-  codex: "bg-violet-400",
-  gemini: "bg-blue-400",
-  antigravity: "bg-fuchsia-400",
-};
+/** The same chip, struck solid: this harness has something waiting on you. */
+export const HARNESS_CHIP_ALERT =
+  "bg-black text-white ring-1 ring-inset ring-black dark:bg-white dark:text-black dark:ring-white";
 
-export const HARNESS_TEXT: Record<HarnessId, string> = {
-  "claude-code": "text-orange-700 dark:text-orange-300",
-  "open-code": "text-emerald-700 dark:text-emerald-300",
-  codex: "text-violet-700 dark:text-violet-300",
-  gemini: "text-blue-700 dark:text-blue-300",
-  antigravity: "text-fuchsia-700 dark:text-fuchsia-300",
-};
+/** A shell-less mark in the pill: filled while it has sessions, hollow while quiet. */
+export const HARNESS_DOT_ACTIVE = "bg-black dark:bg-white";
+export const HARNESS_DOT_QUIET = "border border-black/30 dark:border-white/30";
+
+export const HARNESS_TEXT = "text-black/75 dark:text-white/75";
 
 export const HARNESS_LABEL: Record<HarnessId, string> = {
   "claude-code": "Claude Code",

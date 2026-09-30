@@ -16,6 +16,43 @@ export function duration(sinceMs: number, now: number): string {
 }
 
 /**
+ * Same idea as `duration`, but for history: goes on to days and months, and
+ * rounds rather than counting seconds. "3d" is what you want to know about a
+ * session from last week - "72h 4m" is the same fact in a form nobody reads.
+ */
+export function ago(sinceMs: number, now: number): string {
+  const mins = Math.max(0, Math.floor((now - sinceMs) / 60_000));
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return months < 12 ? `${months}mo ago` : `${Math.floor(months / 12)}y ago`;
+}
+
+/**
+ * The absolute time behind a relative one, for a tooltip: "3 Sep 14:05".
+ *
+ * A history row says "2d ago", which is unreadable as a date and imprecise
+ * across a month boundary - this is the anchor it needs. The year appears only
+ * when it is not the current one, which is the case that actually confuses.
+ */
+export function stamp(atMs: number, now: number): string {
+  const at = new Date(atMs);
+  if (Number.isNaN(at.getTime())) return "";
+  const sameYear = at.getFullYear() === new Date(now).getFullYear();
+  return at.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+/**
  * Wall-clock time of a reset, in the viewer's own timezone: "13:00".
  *
  * A countdown answers "how long", a clock answers "when I can start again",
@@ -91,44 +128,51 @@ export const STATE_LABEL: Record<SessionState, string> = {
   idle: "idle",
   shell: "shell",
   "active-unknown": "active",
-};
-
-export const STATE_STYLE: Record<SessionState, string> = {
-  running: "bg-sky-100 text-sky-700 ring-sky-300 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30",
-  "awaiting-input":
-    "bg-amber-200 text-amber-900 ring-amber-400 dark:bg-amber-500/20 dark:text-amber-200 dark:ring-amber-400/40",
-  "awaiting-permission":
-    "bg-orange-200 text-orange-900 ring-orange-400 dark:bg-orange-500/20 dark:text-orange-200 dark:ring-orange-400/40",
-  idle: "bg-zinc-100 text-zinc-600 ring-zinc-300 dark:bg-zinc-500/15 dark:text-zinc-300 dark:ring-zinc-400/25",
-  shell:
-    "bg-violet-100 text-violet-700 ring-violet-300 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30",
-  "active-unknown":
-    "bg-zinc-100 text-zinc-500 ring-zinc-300 dark:bg-zinc-500/15 dark:text-zinc-400 dark:ring-zinc-400/20",
+  ended: "ended",
 };
 
 /**
- * Row background + left accent. Rows that want something are tinted; idle
- * rows recede. Scanning the list should not require reading it.
+ * Chips are ranked, not coloured: a request for approval is a solid stamp of
+ * ink, a request for input is a hollow one, work in progress is a hairline
+ * outline, and anything passive is a ghost. Reading down a column of chips
+ * tells you the urgency without decoding a single hue.
+ */
+export const STATE_STYLE: Record<SessionState, string> = {
+  running:
+    "bg-black/[0.05] text-black/80 ring-1 ring-inset ring-black/30 dark:bg-white/[0.06] dark:text-white/80 dark:ring-white/25",
+  "awaiting-input":
+    "bg-transparent text-black ring-2 ring-black dark:text-white dark:ring-white",
+  "awaiting-permission":
+    "bg-black text-white ring-2 ring-black dark:bg-white dark:text-black",
+  idle: "bg-transparent text-black/45 ring-1 ring-inset ring-black/20 dark:text-white/45 dark:ring-white/20",
+  shell:
+    "bg-transparent text-black/60 ring-1 ring-inset ring-black/20 dark:text-white/60 dark:ring-white/20",
+  "active-unknown":
+    "bg-transparent text-black/50 ring-1 ring-inset ring-black/15 dark:text-white/50 dark:ring-white/15",
+  ended: "bg-transparent text-black/35 ring-1 ring-inset ring-black/10 dark:text-white/35 dark:ring-white/10",
+};
+
+/**
+ * Row background + left rule. Rows that want something are printed darker;
+ * idle rows recede to paper. A permission row also carries the caution
+ * hatch, the one texture in the list, so the state you must not miss is the
+ * state that does not look like every other block.
+ *
+ * `ended` sits below `idle` rather than beside it: an idle session is a process
+ * that is still there and quietly waiting, so it keeps a rule. An ended one is
+ * a photograph, and gets neither ink nor a gradient.
  */
 export const ROW_TINT: Record<SessionState, string> = {
   running:
-    "bg-gradient-to-r from-sky-500/20 via-sky-500/5 to-transparent border-l-2 border-sky-500 dark:from-sky-400/20 dark:via-sky-400/5 dark:border-sky-400",
+    "bg-gradient-to-r from-black/[0.10] to-transparent border-l-2 border-black/55 dark:from-white/[0.10] dark:border-white/55",
   "awaiting-input":
-    "bg-gradient-to-r from-amber-400/40 via-amber-400/10 to-transparent border-l-2 border-amber-500 dark:from-amber-400/25 dark:via-amber-400/8 dark:border-amber-400",
+    "bg-gradient-to-r from-black/[0.13] to-transparent border-l-2 border-black dark:from-white/[0.13] dark:border-white",
   "awaiting-permission":
-    "bg-gradient-to-r from-orange-400/40 via-orange-400/10 to-transparent border-l-2 border-orange-500 dark:from-orange-400/25 dark:via-orange-400/8 dark:border-orange-400",
-  idle: "bg-black/[0.03] border-l-2 border-transparent opacity-70 dark:bg-white/[0.03]",
+    "hm-hatch bg-gradient-to-r from-black/[0.10] to-transparent border-l-2 border-black dark:from-white/[0.10] dark:border-white",
+  idle: "border-l-2 border-transparent opacity-60",
   shell:
-    "bg-gradient-to-r from-violet-500/20 to-transparent border-l-2 border-violet-500 dark:from-violet-400/20 dark:border-violet-400",
+    "bg-gradient-to-r from-black/[0.06] to-transparent border-l-2 border-black/35 dark:from-white/[0.06] dark:border-white/35",
   "active-unknown":
-    "bg-black/[0.03] border-l-2 border-zinc-400/60 opacity-80 dark:bg-white/[0.03] dark:border-zinc-500",
-};
-
-export const STATE_DOT: Record<SessionState, string> = {
-  running: "bg-sky-500 dark:bg-sky-400",
-  "awaiting-input": "bg-amber-500 dark:bg-amber-400",
-  "awaiting-permission": "bg-orange-500 dark:bg-orange-400",
-  idle: "bg-zinc-400 dark:bg-zinc-500",
-  shell: "bg-violet-500 dark:bg-violet-400",
-  "active-unknown": "bg-zinc-400 dark:bg-zinc-500",
+    "border-l-2 border-black/30 opacity-80 dark:border-white/30",
+  ended: "border-l-2 border-black/10 opacity-60 dark:border-white/10",
 };
