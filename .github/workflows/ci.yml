@@ -64,7 +64,7 @@ jobs:
       # is the combined number. `fail_ci_if_error: false` because an upload
       # outage is not a reason to fail a commit whose tests passed.
       - name: Upload frontend coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage/coverage-final.json
           flags: frontend
@@ -73,7 +73,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Upload backend coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: ./src-tauri/coverage-lcov.info
           flags: backend
