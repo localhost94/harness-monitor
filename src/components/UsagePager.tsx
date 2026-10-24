@@ -1,15 +1,18 @@
-import { HARNESS_CODE, HARNESS_LABEL, type HarnessId, type Snapshot } from "../types";
+import { HARNESS_CODE, HARNESS_LABEL, type Snapshot } from "../types";
 import { formatCost, formatTokens, tokenBreakdown, tokenHeadline } from "../lib/format";
+import { quotaFor, samePage, usagePages, type UsagePage } from "../lib/accounts";
 import { useMonitor } from "../store/useMonitor";
 import { Quota } from "./Quota";
 
 /**
- * The pill has room for one harness's usage at a time, so it pages.
+ * The pill has room for one page of usage at a time, so it pages - over
+ * (account, harness) pairs, not harnesses. Two Claude subscriptions have two
+ * separate 5-hour windows, and one ring for both would describe neither.
  *
- * Claude Code is the default and the only one with a plan window - the rings.
- * Every other harness bills per token, so its page shows what it actually
- * reports: tokens, and cost where it knows one. Paging rather than blending
- * keeps those two kinds of number from being read as comparable.
+ * Claude Code is the only harness with a plan window - the rings. Every other
+ * harness bills per token, so its page shows what it actually reports: tokens,
+ * and cost where it knows one. Paging rather than blending keeps those two
+ * kinds of number from being read as comparable.
  */
 export function UsagePager({
   snapshot,
@@ -22,48 +25,55 @@ export function UsagePager({
   tone: { title: string; sub: string };
   stack?: boolean;
 }) {
-  const { usageHarness, cycleUsage } = useMonitor();
-  const available = snapshot?.detected ?? [];
-  const harness: HarnessId = available.includes(usageHarness)
-    ? usageHarness
-    : (available[0] ?? "claude-code");
+  const { usagePage, cycleUsage } = useMonitor();
+  const pages = usagePages(snapshot);
+  const fallback: UsagePage = { account: "", harness: "claude-code" };
+  const page = pages.find((p) => samePage(p, usagePage)) ?? pages[0] ?? fallback;
+  // One account is the common case: naming it on every page would be chrome
+  // that never changes. It appears only once there is something to tell apart.
+  const multiAccount = (snapshot?.accounts.length ?? 0) > 1;
 
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center gap-0.5">
         <Chevron
           direction="prev"
-          disabled={available.length < 2}
+          disabled={pages.length < 2}
           tone={tone.sub}
-          onClick={() => cycleUsage(-1, available)}
+          onClick={() => cycleUsage(-1, pages)}
         />
         <span
           data-tauri-drag-region
-          title={`Usage for ${HARNESS_LABEL[harness]}${
-            available.length > 1 ? " — arrows page through the others" : ""
-          }`}
-          className={`min-w-[1.6rem] text-center text-[9px] font-bold tracking-wide ${tone.title}`}
+          title={`Usage for ${HARNESS_LABEL[page.harness]}${
+            page.account ? ` on ${page.account}` : ""
+          }${pages.length > 1 ? " — arrows page through the others" : ""}`}
+          className={`flex min-w-[1.6rem] max-w-[4.5rem] flex-col items-center leading-none ${tone.title}`}
         >
-          {HARNESS_CODE[harness]}
+          <span className="text-[9px] font-bold tracking-wide">{HARNESS_CODE[page.harness]}</span>
+          {multiAccount && (
+            <span className={`w-full truncate text-center text-[8px] font-medium ${tone.sub}`}>
+              {page.account}
+            </span>
+          )}
         </span>
         <Chevron
           direction="next"
-          disabled={available.length < 2}
+          disabled={pages.length < 2}
           tone={tone.sub}
-          onClick={() => cycleUsage(1, available)}
+          onClick={() => cycleUsage(1, pages)}
         />
       </div>
 
-      {harness === "claude-code" ? (
+      {page.harness === "claude-code" ? (
         <Quota
-          quota={snapshot?.quota ?? null}
+          quota={quotaFor(snapshot, page.account)}
           now={now}
           tone={tone}
           stack={stack}
           pending={!snapshot}
         />
       ) : (
-        <HarnessUsage snapshot={snapshot} harness={harness} tone={tone} />
+        <HarnessUsage snapshot={snapshot} page={page} tone={tone} />
       )}
     </div>
   );
@@ -71,14 +81,16 @@ export function UsagePager({
 
 function HarnessUsage({
   snapshot,
-  harness,
+  page,
   tone,
 }: {
   snapshot: Snapshot | null;
-  harness: HarnessId;
+  page: UsagePage;
   tone: { title: string; sub: string };
 }) {
-  const sessions = (snapshot?.sessions ?? []).filter((s) => s.key.harness === harness);
+  const sessions = (snapshot?.sessions ?? []).filter(
+    (s) => s.key.harness === page.harness && s.key.account === page.account,
+  );
   let tokens = 0;
   let cost = 0;
   for (const session of sessions) {
@@ -135,7 +147,7 @@ function Chevron({
     <button
       onClick={onClick}
       disabled={disabled}
-      title={direction === "prev" ? "Previous harness" : "Next harness"}
+      title={direction === "prev" ? "Previous account / harness" : "Next account / harness"}
       className={`rounded p-px transition hover:bg-indigo-950/10 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-white/10 ${tone}`}
     >
       <svg

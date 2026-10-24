@@ -11,6 +11,10 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct PathResolver {
     home: PathBuf,
+    /// Resolved once, not per call: `XDG_STATE_HOME` is process-global, so
+    /// letting it win for every resolver would point all watched accounts at
+    /// one quota.json and report one account's plan window as everyone's.
+    state: PathBuf,
     /// Windows user profile, as seen from this host. None if not reachable.
     win_home: Option<PathBuf>,
 }
@@ -22,22 +26,25 @@ impl PathResolver {
             .map(PathBuf::from)
             .or_else(dirs::home_dir)
             .unwrap_or_else(|| PathBuf::from("/"));
-        let win_home = if cfg!(windows) {
-            Some(home.clone())
-        } else {
-            find_windows_home()
-        };
-        Self { home, win_home }
+        // Only the user's own home may answer to XDG_STATE_HOME - it describes
+        // this process's environment, not some other account's tree.
+        let state = std::env::var_os("XDG_STATE_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join(".local/state"));
+        Self {
+            state,
+            win_home: windows_home(&home),
+            home,
+        }
     }
 
-    /// Explicit root, for tests and for pointing at another user's tree.
+    /// Explicit root: a watched account, or a test fixture tree.
     pub fn for_home(home: PathBuf) -> Self {
-        let win_home = if cfg!(windows) {
-            Some(home.clone())
-        } else {
-            find_windows_home()
-        };
-        Self { home, win_home }
+        Self {
+            state: home.join(".local/state"),
+            win_home: windows_home(&home),
+            home,
+        }
     }
 
     pub fn claude_root(&self) -> PathBuf {
@@ -70,10 +77,7 @@ impl PathResolver {
 
     /// State file written by the statusline shim (installer/statusline-shim.sh).
     pub fn quota_state(&self) -> PathBuf {
-        std::env::var_os("XDG_STATE_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| self.home.join(".local/state"))
-            .join("harness-monitor/quota.json")
+        self.state.join("harness-monitor/quota.json")
     }
 
     pub fn opencode_db(&self) -> PathBuf {
@@ -97,6 +101,14 @@ impl PathResolver {
             .as_ref()
             .map(|w| w.join(".gemini/antigravity"))
             .filter(|p| p.is_dir())
+    }
+}
+
+fn windows_home(home: &Path) -> Option<PathBuf> {
+    if cfg!(windows) {
+        Some(home.to_path_buf())
+    } else {
+        find_windows_home()
     }
 }
 

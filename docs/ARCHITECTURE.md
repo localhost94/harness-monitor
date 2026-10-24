@@ -57,12 +57,20 @@ Adapters only parse. Liveness, transitions, dedup and delivery live in
 process table, and per-adapter streaming would give every adapter its own place
 to get it wrong.
 
-## Identity is the process
+## Identity is the process, scoped to its account
 
 `sessionId` is **not** unique - resuming a session reuses it under a new pid
 (observed twice on one machine). Identity is
-`(harness, pidDomain, pid, procStart)`. Anything keyed on the session id merges
-two sessions and cross-fires their notifications.
+`(account, harness, pidDomain, pid, procStart)`. Anything keyed on the session
+id merges two sessions and cross-fires their notifications.
+
+`account` is in there for the same reason, one level up. `pidDomain` is
+authoritative only for Claude Code; the other adapters synthesise a constant
+("opencode:db", "codex:presence"), so two watched account trees holding the
+same session file - a copied home, a shared mount, one home symlinked into
+two account roots - would collide on every other field. The adapters do not
+know whose tree they are reading, so `scanner.rs` stamps the label after the
+scan rather than threading it through five adapters.
 
 Liveness compares `procStart` against field 22 of `/proc/<pid>/stat`, parsed
 after the **last** `)` because the comm field can contain spaces and parens.
@@ -100,7 +108,35 @@ a reported one. Two things are deliberately **not** implemented:
 - **antigravity state.** An mtime cannot distinguish running from waiting from
   finished, and a false "finished" fires a false notification - worse than none.
 
+## An account is a home directory
+
+The adapters take a `PathResolver`, and every root they need hangs off one home
+(`.claude`, `.codex`, `.local/share/opencode`, `.gemini`). Watching a second
+account is therefore a second resolver, not a second code path - the multi-
+account support is `Scanner` holding a `Vec` of what used to be its own fields,
+and nothing below it changed.
+
+Adapters are per account, not shared. `ClaudeCodeAdapter` and
+`OpenCodeAdapter` both carry a read cursor (a transcript byte offset, an event
+id), and one cursor serving two homes would attribute one account's new tokens
+to whichever account happened to be scanned next.
+
+One thing this did require fixing: `XDG_STATE_HOME` is a property of *this*
+process, not of the tree being read, so `PathResolver` now resolves its state
+directory once at construction and only the user's own resolver consults the
+env var. Letting it win for every account pointed them all at one `quota.json`
+and reported one account's plan window as everyone's.
+
+Accounts do not extend the app's reach. It reads local files and makes no
+network calls, so an account is only visible if its tree is readable from this
+host. A harness that writes nothing local - a web product - has no adapter to
+write, not a missing one.
+
 ## Quota is mirrored, never derived
+
+Per account: two Claude subscriptions have two independent windows, so
+`Snapshot.quotas` is a list keyed by account label and the UI renders one set
+of rings per account rather than an average of nobody's.
 
 The 5-hour plan percentage is read from whichever source is newer: the
 statusline shim's state file (written on every statusline render) or a `Stop`

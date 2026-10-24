@@ -33,6 +33,7 @@ running that session.
 [Jump to a session](#jump-to-a-session) &middot;
 [Notification rules](#notification-rules) &middot;
 [Usage numbers](#usage-numbers) &middot;
+[Several accounts](#several-accounts) &middot;
 [Harness support](#harness-support) &middot;
 [Build and run](#build-and-run) &middot;
 [Why not one of the others](#why-not-one-of-the-others) &middot;
@@ -270,6 +271,52 @@ to re-run):
 ./installer/install-statusline.sh --uninstall
 ```
 
+## Several accounts
+
+One machine, several subscriptions: a team lead watching marketing's Claude and
+engineering's Claude needs them apart, not summed. Two accounts on the same
+plan tier burn two independent 5-hour windows, and one number for both
+describes neither.
+
+An account is a **home directory**. Everything the adapters read hangs off one
+(`.claude`, `.codex`, `.local/share/opencode`, `.gemini`), so watching a second
+account is pointing the scanner at a second root. List them in
+`~/.config/harness-monitor/accounts.json` (or anywhere, via `HM_ACCOUNTS`):
+
+```json
+[
+  { "division": "marketing",   "label": "claude-rina",  "home": "~/accounts/rina" },
+  { "division": "ops",         "label": "ops-shared",   "home": "~/accounts/ops" },
+  { "division": "engineering", "label": "eng-core",     "home": "~" }
+]
+```
+
+`label` must be unique - it is part of session identity, not decoration.
+`division` is free text and may repeat; leave it out and the account renders
+ungrouped. With no config file at all, the app watches your own home and every
+surface looks exactly as it did before accounts existed.
+
+The panel then nests division → account → harness, with each account's own plan
+window in its header, and the pill's arrows page through `(account, harness)`
+pairs instead of harnesses. Whatever is blocked on a human sorts to the top at
+every level.
+
+Two things worth knowing before you configure it:
+
+- **A harness whose config lives outside the account home needs a symlink.**
+  Claude Code's `CLAUDE_CONFIG_DIR` is the common case: point
+  `~/accounts/rina/.claude` at it and the adapters find it with no second
+  config shape to keep in sync.
+- **The quota shim follows `$HOME`, not the account.** If two accounts share
+  one `$HOME`, both statuslines write the same `quota.json` and one account's
+  plan window is reported as everyone's. Set `HM_STATE_DIR` per account
+  (`<account home>/.local/state/harness-monitor`) in that account's
+  `settings.json`, or give each account a real home.
+
+Accounts do not make the app see machines it is not on: it reads local files
+and makes no network calls. An account only appears here if its tree is
+readable from this host - the same home, a mount, or a sync.
+
 ## Harness support
 
 | Harness | State | Usage | Source |
@@ -296,7 +343,7 @@ bun install
 bun run build
 
 cd src-tauri
-cargo test                 # 28 tests, no GUI needed
+cargo test                 # 32 tests, no GUI needed
 cargo run                  # runs the app against your real sessions
 cargo run -- --agent       # NDJSON snapshots on stdout
 ```
@@ -440,6 +487,13 @@ one place.
 - Quota is Claude-only. Other harnesses have their own independent limits, so
   a single blended "usage" number across harnesses would be fiction; their
   cost is shown separately.
+- **Only tools that write local files can be tracked at all.** Everything here
+  is read from disk on this host, with no network calls and no API keys - so a
+  web product (ChatGPT, Claude.ai) leaves nothing to read, and a CLI with no
+  adapter yet (Grok, and anything not in the table above) is invisible even
+  when it is installed. A division whose work happens in a browser, or on
+  someone else's laptop, cannot be monitored from here; that would need each
+  machine to report in, which this app deliberately does not do.
 
 ## Contributing
 

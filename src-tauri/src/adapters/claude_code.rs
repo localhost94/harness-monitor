@@ -249,6 +249,7 @@ fn parse_session_file(path: &PathBuf) -> Result<Option<AgentSession>> {
 
     Ok(Some(AgentSession {
         key: SessionKey {
+            account: String::new(), // stamped by the scanner
             harness: HarnessId::ClaudeCode,
             pid_domain: file.pid_domain.unwrap_or_else(|| "local".into()),
             pid: file.pid,

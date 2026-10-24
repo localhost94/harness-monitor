@@ -274,6 +274,7 @@ mod tests {
     fn session(pid: i64, state: SessionState, changed_at: i64) -> AgentSession {
         AgentSession {
             key: SessionKey {
+                account: "eng".into(),
                 harness: HarnessId::ClaudeCode,
                 pid_domain: "linux:x".into(),
                 pid,
@@ -303,9 +304,9 @@ mod tests {
     fn snap(sessions: Vec<AgentSession>) -> Snapshot {
         Snapshot {
             taken_at: 0,
-            detected: vec![HarnessId::ClaudeCode],
             sessions,
-            quota: None,
+            accounts: Vec::new(),
+            quotas: Vec::new(),
             reseed: false,
         }
     }

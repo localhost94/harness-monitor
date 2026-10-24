@@ -1,4 +1,5 @@
 import { modeOf, surfaceFor } from "../lib/theme";
+import { detectedHarnesses } from "../lib/accounts";
 import { useMonitor } from "../store/useMonitor";
 import { DragGrip } from "./DragGrip";
 import { HarnessChips } from "./HarnessChips";
@@ -127,7 +128,7 @@ export function Pill() {
         </div>
 
         <StatStrip sessions={sessions} vertical />
-        <HarnessChips sessions={sessions} detected={snapshot?.detected ?? []} vertical />
+        <HarnessChips sessions={sessions} detected={detectedHarnesses(snapshot)} vertical />
 
         <div className="flex items-end justify-between gap-px self-end">{controls}</div>
       </div>
@@ -171,7 +172,7 @@ export function Pill() {
             className="h-3 w-px bg-indigo-950/15 dark:bg-white/15"
             aria-hidden="true"
           />
-          <HarnessChips sessions={sessions} detected={snapshot?.detected ?? []} />
+          <HarnessChips sessions={sessions} detected={detectedHarnesses(snapshot)} />
         </div>
       </div>
 

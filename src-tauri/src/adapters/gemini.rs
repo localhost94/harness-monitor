@@ -127,6 +127,7 @@ fn parse_chat(path: &PathBuf, touched: i64, now: i64) -> Option<AgentSession> {
 
     Some(AgentSession {
         key: SessionKey {
+            account: String::new(), // stamped by the scanner
             harness: HarnessId::Gemini,
             pid_domain: "gemini:file".into(),
             pid: super::opencode::stable_id(&path.to_string_lossy()),

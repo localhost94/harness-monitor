@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { MOCK_SNAPSHOT } from "../lib/mock";
-import type { HarnessId, Snapshot } from "../types";
+import { samePage, type UsagePage } from "../lib/accounts";
+import type { Snapshot } from "../types";
 
 type Theme = "light" | "dark";
 type Orientation = "horizontal" | "vertical";
@@ -13,9 +14,9 @@ interface MonitorState {
   toggleTheme: () => void;
   orientation: Orientation;
   toggleOrientation: () => Promise<void>;
-  /** Which harness the pill's usage pager is showing. */
-  usageHarness: HarnessId;
-  cycleUsage: (delta: number, available: HarnessId[]) => void;
+  /** Which (account, harness) the pill's usage pager is showing. */
+  usagePage: UsagePage | null;
+  cycleUsage: (delta: number, pages: UsagePage[]) => void;
   /** Last action error, shown briefly in the panel footer. */
   error: string | null;
   focusSession: (target: string) => Promise<void>;
@@ -52,16 +53,40 @@ function readTheme(): Theme {
   }
 }
 
-/** Claude Code by default: it is the only harness with a plan window. */
-function readUsageHarness(): HarnessId {
-  const override = new URLSearchParams(location.search).get("usage");
-  if (override) return override as HarnessId;
+/**
+ * Null means "first page available", resolved against the live snapshot rather
+ * than guessed here: with several accounts there is no single sensible default,
+ * and a stored page whose account has since gone away must not pin the pager
+ * to something that no longer exists.
+ */
+function readUsagePage(): UsagePage | null {
   try {
-    const stored = localStorage.getItem("hm.usageHarness");
-    return (stored as HarnessId) || "claude-code";
+    const stored = localStorage.getItem("hm.usagePage");
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    return typeof parsed?.account === "string" && typeof parsed?.harness === "string"
+      ? parsed
+      : null;
   } catch {
-    return "claude-code";
+    return null;
   }
+}
+
+/** Everything under one unnamed account, as an install with no accounts.json. */
+function soloAccount(snapshot: Snapshot): Snapshot {
+  const label = "this machine";
+  return {
+    ...snapshot,
+    accounts: [
+      {
+        label,
+        division: "",
+        detected: [...new Set(snapshot.accounts.flatMap((a) => a.detected))],
+      },
+    ],
+    sessions: snapshot.sessions.map((s) => ({ ...s, key: { ...s.key, account: label } })),
+    quotas: snapshot.quotas.slice(0, 1).map((q) => ({ ...q, account: label })),
+  };
 }
 
 function readOrientation(): Orientation {
@@ -78,7 +103,7 @@ export const useMonitor = create<MonitorState>((set, get) => ({
   snapshot: null,
   theme: readTheme(),
   orientation: readOrientation(),
-  usageHarness: readUsageHarness(),
+  usagePage: readUsagePage(),
   error: null,
   receivedAt: null,
   startedAt: Date.now(),
@@ -116,8 +141,13 @@ export const useMonitor = create<MonitorState>((set, get) => ({
           })),
         ).flat();
       }
+      // ?accounts=one folds the fixture back onto a single account - the
+      // default install, and the layout that must not have regressed.
+      let snapshot: Snapshot = { ...MOCK_SNAPSHOT, sessions };
+      if (params.get("accounts") === "one") snapshot = soloAccount(snapshot);
+
       set({
-        snapshot: { ...MOCK_SNAPSHOT, sessions },
+        snapshot,
         receivedAt: Date.now(),
         expanded: !params.has("collapsed"),
       });
@@ -152,18 +182,18 @@ export const useMonitor = create<MonitorState>((set, get) => ({
     set({ theme });
   },
 
-  cycleUsage: (delta: number, available: HarnessId[]) => {
-    if (available.length === 0) return;
-    const current = available.indexOf(get().usageHarness);
-    // A harness that has since disappeared leaves index -1; stepping from
-    // there lands on the first entry, which is what you want.
-    const next = available[(current + delta + available.length) % available.length];
+  cycleUsage: (delta: number, pages: UsagePage[]) => {
+    if (pages.length === 0) return;
+    const current = pages.findIndex((p) => samePage(p, get().usagePage));
+    // A page whose account or harness has since disappeared leaves index -1;
+    // stepping from there lands on the first entry, which is what you want.
+    const next = pages[(current + delta + pages.length) % pages.length];
     try {
-      localStorage.setItem("hm.usageHarness", next);
+      localStorage.setItem("hm.usagePage", JSON.stringify(next));
     } catch {
       // Private mode: the choice just won't survive a restart.
     }
-    set({ usageHarness: next });
+    set({ usagePage: next });
   },
 
   focusSession: async (target: string) => {

@@ -44,7 +44,7 @@ case "${1:---install}" in
   --status)
     echo "statusLine.command: ${current:-<unset>}"
     [ -f "$ORIG_DEST" ] && echo "wrapped original:   $ORIG_DEST"
-    echo "quota state:        ${XDG_STATE_HOME:-$HOME/.local/state}/harness-monitor/quota.json"
+    echo "quota state:        ${HM_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/harness-monitor}/quota.json"
     ;;
 
   --install)

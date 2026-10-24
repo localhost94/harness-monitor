@@ -8,7 +8,12 @@
 # output must be untouched: if this script breaks, the user's statusline breaks.
 set -uo pipefail
 
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/harness-monitor"
+# HM_STATE_DIR is for the multi-account case: HarnessMonitor reads each watched
+# account's quota at <account home>/.local/state/harness-monitor/quota.json, so
+# a Claude that shares $HOME with another account (CLAUDE_CONFIG_DIR pointing
+# elsewhere, rather than a separate home) must be told where to write, or both
+# accounts overwrite one file and one plan window is reported as everyone's.
+STATE_DIR="${HM_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/harness-monitor}"
 STATE_FILE="$STATE_DIR/quota.json"
 ORIG="${HM_STATUSLINE_ORIG:-$HOME/.claude/statusline-command.orig.sh}"
 

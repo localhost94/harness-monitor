@@ -28,7 +28,7 @@ pub fn spawn_source(tx: Sender<Snapshot>, interval_ms: u64) {
 
 fn run_local(tx: Sender<Snapshot>, interval_ms: u64) {
     let mut scanner = Scanner::new();
-    tracing::info!(detected = ?scanner.detected(), "local scanner ready");
+    tracing::info!(accounts = ?scanner.detected(), "local scanner ready");
     loop {
         let snapshot = scanner.tick();
         if tx.send(snapshot).is_err() {

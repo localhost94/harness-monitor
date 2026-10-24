@@ -16,6 +16,8 @@ export type SessionState =
 export type FidelityTier = "full" | "usage-only" | "presence-only";
 
 export interface SessionKey {
+  /** Watched account this session belongs to - part of identity, not a label. */
+  account: string;
   harness: HarnessId;
   pid_domain: string;
   pid: number;
@@ -51,6 +53,7 @@ export interface AgentSession {
 }
 
 export interface QuotaSnapshot {
+  account: string;
   at: number;
   source: string;
   tier: string | null;
@@ -60,11 +63,21 @@ export interface QuotaSnapshot {
   seven_day_resets_at: string | null;
 }
 
+/** One watched account, and what was found under it this tick. */
+export interface AccountSnapshot {
+  label: string;
+  /** Empty means ungrouped - rendered without a division header, not as "misc". */
+  division: string;
+  /** Empty means nothing installed under that home, or the home is unreachable. */
+  detected: HarnessId[];
+}
+
 export interface Snapshot {
   taken_at: number;
-  detected: HarnessId[];
+  accounts: AccountSnapshot[];
   sessions: AgentSession[];
-  quota: QuotaSnapshot | null;
+  /** At most one per account; only Claude Code has a plan window at all. */
+  quotas: QuotaSnapshot[];
   reseed: boolean;
 }
 

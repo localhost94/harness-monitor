@@ -1,3 +1,4 @@
+pub mod accounts;
 pub mod adapters;
 pub mod agent;
 pub mod bridge;
@@ -205,8 +206,12 @@ fn start_pipeline(app: AppHandle) {
             tracing::debug!(
                 sessions = snapshot.sessions.len(),
                 notifications = events.len(),
-                quota_pct = ?snapshot.quota.as_ref().and_then(|q| q.five_hour_pct),
-                quota_source = ?snapshot.quota.as_ref().map(|q| q.source.as_str()),
+                accounts = snapshot.accounts.len(),
+                quotas = ?snapshot
+                    .quotas
+                    .iter()
+                    .map(|q| (q.account.as_str(), q.five_hour_pct))
+                    .collect::<Vec<_>>(),
                 "snapshot"
             );
 

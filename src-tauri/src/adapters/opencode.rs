@@ -103,6 +103,7 @@ impl OpenCodeAdapter {
             let state = derive_state(last.as_ref(), row.time_updated, now);
             out.push(AgentSession {
                 key: SessionKey {
+            account: String::new(), // stamped by the scanner
                     harness: HarnessId::OpenCode,
                     // Not a process: opencode sessions are database rows, so
                     // identity is a stable hash of the row id.

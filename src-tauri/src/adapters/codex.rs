@@ -111,6 +111,7 @@ fn read_threads(root: &Path, now: i64) -> Result<Vec<AgentSession>> {
         };
         out.push(AgentSession {
             key: SessionKey {
+            account: String::new(), // stamped by the scanner
                 harness: HarnessId::Codex,
                 pid_domain: "codex:db".into(),
                 pid: super::opencode::stable_id(&id),
@@ -164,6 +165,7 @@ fn presence_row(root: &Path, now: i64) -> Option<AgentSession> {
     }
     Some(AgentSession {
         key: SessionKey {
+            account: String::new(), // stamped by the scanner
             harness: HarnessId::Codex,
             pid_domain: "codex:presence".into(),
             pid: 0,

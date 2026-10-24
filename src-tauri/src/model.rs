@@ -43,6 +43,12 @@ pub enum FidelityTier {
 /// Identity is the process itself.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SessionKey {
+    /// Which watched account this session belongs to. Part of identity, not a
+    /// label: `pid_domain` is synthesised per adapter ("opencode:db",
+    /// "codex:presence"), so two accounts would otherwise collide on it and
+    /// cross-fire each other's notifications.
+    #[serde(default)]
+    pub account: String,
     pub harness: HarnessId,
     pub pid_domain: String,
     pub pid: i64,
@@ -52,8 +58,8 @@ pub struct SessionKey {
 impl SessionKey {
     pub fn ui_id(&self) -> String {
         format!(
-            "{:?}:{}:{}:{}",
-            self.harness, self.pid_domain, self.pid, self.proc_start
+            "{}:{:?}:{}:{}:{}",
+            self.account, self.harness, self.pid_domain, self.pid, self.proc_start
         )
     }
 }
@@ -125,6 +131,10 @@ pub struct AgentSession {
 /// derived from token counts.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QuotaSnapshot {
+    /// The account this window belongs to. Two Claude subscriptions have two
+    /// independent 5-hour windows; averaging them would describe neither.
+    #[serde(default)]
+    pub account: String,
     /// Epoch ms the reading was produced. Used to render staleness.
     pub at: i64,
     pub source: String,
@@ -135,15 +145,26 @@ pub struct QuotaSnapshot {
     pub seven_day_resets_at: Option<String>,
 }
 
+/// One watched account, and what was found under it this tick.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AccountSnapshot {
+    pub label: String,
+    pub division: String,
+    /// Harnesses whose data root was found under this account's home. An
+    /// adapter that did not detect is absent from `sessions` because it is not
+    /// installed, not because it is idle - the UI needs to tell those apart.
+    /// An account with an empty list is reachable-but-bare, or not mounted.
+    pub detected: Vec<HarnessId>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Snapshot {
     pub taken_at: i64,
-    /// Harnesses whose data root was found on this host. Adapters that did not
-    /// detect are absent from `sessions` because they are not installed, not
-    /// because they are idle - the UI needs to tell those apart.
-    pub detected: Vec<HarnessId>,
+    pub accounts: Vec<AccountSnapshot>,
     pub sessions: Vec<AgentSession>,
-    pub quota: Option<QuotaSnapshot>,
+    /// At most one per account, and only for harnesses that have a plan window
+    /// at all - today that is Claude Code alone.
+    pub quotas: Vec<QuotaSnapshot>,
     /// Set when the producer restarted. Tells the differ to reseed instead of
     /// diffing, so an agent respawn does not fire a toast per session.
     #[serde(default)]

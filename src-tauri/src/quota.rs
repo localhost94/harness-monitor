@@ -55,6 +55,8 @@ fn read_shim(paths: &PathResolver) -> Option<QuotaSnapshot> {
     let file: ShimFile = serde_json::from_str(&raw).ok()?;
     let limits = file.rate_limits?;
     Some(QuotaSnapshot {
+        // Stamped by the scanner, which is what knows the account.
+        account: String::new(),
         at: (file.at * 1000.0) as i64,
         source: "statusline".into(),
         tier: None,
@@ -120,6 +122,7 @@ fn read_hook(paths: &PathResolver) -> Option<QuotaSnapshot> {
     let line = raw.lines().rev().find(|l| !l.trim().is_empty())?;
     let parsed: HookLine = serde_json::from_str(line).ok()?;
     Some(QuotaSnapshot {
+        account: String::new(),
         at: parse_iso(&parsed.at).unwrap_or_else(now_ms),
         source: "stop-hook".into(),
         tier: parsed.tier,
@@ -169,6 +172,7 @@ mod tests {
     #[test]
     fn staleness_uses_reading_age() {
         let q = QuotaSnapshot {
+            account: "eng".into(),
             at: 1_000_000,
             source: "stop-hook".into(),
             tier: None,

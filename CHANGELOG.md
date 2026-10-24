@@ -8,6 +8,18 @@ Notable changes to HarnessMonitor. Format follows
 
 ### Added
 
+- **Several accounts, grouped by division.** A team lead with one Claude
+  subscription per division can now watch them side by side instead of one
+  blended figure: list each account's home in
+  `~/.config/harness-monitor/accounts.json` and the panel nests
+  division → account → harness, with that account's own 5h/7d plan window in
+  its header. The pill's arrows page through `(account, harness)` pairs.
+  With no config file the app watches your own home and every surface renders
+  as before. Session identity now carries the account label, so two trees
+  holding the same session file no longer merge into one row and cross-fire
+  each other's notifications. Only accounts whose tree is readable from this
+  host can be watched - the app still makes no network calls.
+
 - **An experimental macOS build**, shipped as one universal (Apple Silicon +
   Intel) `.dmg`. macOS needs no agent half - the adapters run in-process the way
   they do on Linux - and the app registers as a tray-only accessory, so it keeps
@@ -20,8 +32,8 @@ Notable changes to HarnessMonitor. Format follows
   Claude Code's token figures are new - its state file has none, so the adapter
   now tails the session transcript with a byte cursor and folds in only what was
   appended, skipping sidechain lines so subagent turns are not double-counted.
-- A **usage pager** in the pill: `‹ CC ›` steps through the detected harnesses,
-  defaulting to Claude Code and remembering the choice. Claude's page shows the
+- A **usage pager** in the pill: `‹ CC ›` steps through the detected harnesses
+  of every watched account, remembering the choice. Claude's page shows the
   5h/7d plan rings; every other harness shows the tokens and cost it reports.
   Paging rather than blending, because a percentage of a subscription and a
   token count are not comparable figures.

@@ -51,6 +51,7 @@ impl HarnessAdapter for AntigravityAdapter {
 
         Ok(vec![AgentSession {
             key: SessionKey {
+            account: String::new(), // stamped by the scanner
                 harness: HarnessId::Antigravity,
                 pid_domain: "antigravity:presence".into(),
                 pid: 0,

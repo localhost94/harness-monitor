@@ -4,23 +4,54 @@ import type { Snapshot } from "../types";
  * Fixture used only when the page is opened in a plain browser (no Tauri
  * bridge). It exists so the UI can be reviewed - every state at once - without
  * waiting for real sessions to happen to be in those states.
+ *
+ * Three accounts across two divisions, two of them on Claude: that is the
+ * shape the nesting and the per-account plan windows exist for, and reviewing
+ * against a single-account fixture would never show either.
  */
 export const MOCK_SNAPSHOT: Snapshot = {
   taken_at: Date.now(),
-  detected: ["claude-code", "open-code", "codex", "gemini", "antigravity"],
-  quota: {
-    at: Date.now() - 40_000,
-    source: "statusline",
-    tier: "default_claude_max_5x",
-    five_hour_pct: 64,
-    five_hour_resets_at: new Date(Date.now() + 97 * 60_000).toISOString(),
-    seven_day_pct: 34,
-    seven_day_resets_at: new Date(Date.now() + 61 * 3600_000).toISOString(),
-  },
+  accounts: [
+    { label: "claude-rina", division: "marketing", detected: ["claude-code"] },
+    { label: "ops-shared", division: "ops", detected: ["codex"] },
+    {
+      label: "eng-core",
+      division: "engineering",
+      detected: ["claude-code", "open-code", "codex", "gemini", "antigravity"],
+    },
+  ],
+  quotas: [
+    {
+      account: "claude-rina",
+      at: Date.now() - 40_000,
+      source: "statusline",
+      tier: "default_claude_max_5x",
+      five_hour_pct: 91,
+      five_hour_resets_at: new Date(Date.now() + 22 * 60_000).toISOString(),
+      seven_day_pct: 77,
+      seven_day_resets_at: new Date(Date.now() + 40 * 3600_000).toISOString(),
+    },
+    {
+      account: "eng-core",
+      at: Date.now() - 40_000,
+      source: "statusline",
+      tier: "default_claude_max_5x",
+      five_hour_pct: 64,
+      five_hour_resets_at: new Date(Date.now() + 97 * 60_000).toISOString(),
+      seven_day_pct: 34,
+      seven_day_resets_at: new Date(Date.now() + 61 * 3600_000).toISOString(),
+    },
+  ],
   reseed: false,
   sessions: [
     {
-      key: { harness: "claude-code", pid_domain: "linux:x", pid: 46597, proc_start: "1" },
+      key: {
+        account: "eng-core",
+        harness: "claude-code",
+        pid_domain: "linux:x",
+        pid: 46597,
+        proc_start: "1",
+      },
       session_id: "a",
       cwd: "/home/you/code/harness-monitor",
       name: "harness-monitor",
@@ -37,10 +68,16 @@ export const MOCK_SNAPSHOT: Snapshot = {
       terminal_title: "◑ harness-monitor",
     },
     {
-      key: { harness: "claude-code", pid_domain: "linux:x", pid: 121148, proc_start: "2" },
+      key: {
+        account: "claude-rina",
+        harness: "claude-code",
+        pid_domain: "linux:x",
+        pid: 121148,
+        proc_start: "2",
+      },
       session_id: "b",
-      cwd: "/home/you/code/checkout-service",
-      name: "checkout-service",
+      cwd: "/home/rina/campaigns/q4-launch",
+      name: "q4-launch",
       state: "awaiting-input",
       state_changed_at: Date.now() - 8_000,
       started_at: Date.now() - 3_600_000,
@@ -54,7 +91,13 @@ export const MOCK_SNAPSHOT: Snapshot = {
       terminal_title: null,
     },
     {
-      key: { harness: "open-code", pid_domain: "opencode:db", pid: 991, proc_start: "3" },
+      key: {
+        account: "eng-core",
+        harness: "open-code",
+        pid_domain: "opencode:db",
+        pid: 991,
+        proc_start: "3",
+      },
       session_id: "c",
       cwd: "/home/you/code/pipeline-manager",
       name: "Extract Docker spec",
@@ -71,7 +114,13 @@ export const MOCK_SNAPSHOT: Snapshot = {
       terminal_title: "OC | Extract Docker spec",
     },
     {
-      key: { harness: "open-code", pid_domain: "opencode:db", pid: 992, proc_start: "4" },
+      key: {
+        account: "eng-core",
+        harness: "open-code",
+        pid_domain: "opencode:db",
+        pid: 992,
+        proc_start: "4",
+      },
       session_id: "d",
       cwd: "/home/you/code/docs-site",
       name: "Local script, no Docker",
@@ -88,9 +137,15 @@ export const MOCK_SNAPSHOT: Snapshot = {
       terminal_title: "OC | Local script",
     },
     {
-      key: { harness: "codex", pid_domain: "codex:presence", pid: 0, proc_start: "presence" },
+      key: {
+        account: "ops-shared",
+        harness: "codex",
+        pid_domain: "codex:presence",
+        pid: 0,
+        proc_start: "presence",
+      },
       session_id: "e",
-      cwd: "/home/you/.codex",
+      cwd: "/home/ops/.codex",
       name: "codex",
       state: "active-unknown",
       state_changed_at: Date.now() - 45_000,

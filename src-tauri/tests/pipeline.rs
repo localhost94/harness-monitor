@@ -1,11 +1,12 @@
 //! End-to-end over the real filesystem: session files in, notifications out.
 //!
-//! Covers the two things unit tests cannot: that a dead pid's file is dropped
-//! before it can be diffed, and that a live session finishing a turn produces
-//! exactly one toast.
+//! Covers the three things unit tests cannot: that a dead pid's file is dropped
+//! before it can be diffed, that a live session finishing a turn produces
+//! exactly one toast, and that two watched accounts never merge into one.
 
 use std::path::Path;
 
+use harness_monitor_lib::accounts::Account;
 use harness_monitor_lib::differ::{Differ, DifferConfig, NotifyKind, Outgoing};
 use harness_monitor_lib::model::now_ms;
 use harness_monitor_lib::paths::PathResolver;
@@ -23,9 +24,17 @@ fn write_session(dir: &Path, pid: u32, proc_start: &str, status: &str, updated: 
 }
 
 /// starttime of a process we know is alive: this test process.
+#[cfg(target_os = "linux")]
 fn own_proc_start() -> String {
     let raw = std::fs::read_to_string(format!("/proc/{}/stat", std::process::id())).unwrap();
     harness_monitor_lib::liveness::parse_start_time(&raw).unwrap()
+}
+
+/// Off Linux there is no procfs, so `liveness::check` answers Unknown for
+/// every pid and the value here is never compared against anything.
+#[cfg(not(target_os = "linux"))]
+fn own_proc_start() -> String {
+    "0".into()
 }
 
 fn temp_home(tag: &str) -> std::path::PathBuf {
@@ -35,6 +44,9 @@ fn temp_home(tag: &str) -> std::path::PathBuf {
     dir
 }
 
+/// Liveness is a /proc read; without one every ghost file survives the filter,
+/// so this assertion only means anything on Linux (see docs/ARCHITECTURE.md).
+#[cfg(target_os = "linux")]
 #[test]
 fn ghosts_are_dropped_and_a_finished_turn_fires_once() {
     let home = temp_home("pipeline");
@@ -114,4 +126,67 @@ fn permission_prompt_reports_its_reason() {
     }
 
     let _ = std::fs::remove_dir_all(&home);
+}
+
+fn write_quota(home: &Path, five_hour_pct: f64) {
+    let dir = home.join(".local/state/harness-monitor");
+    std::fs::create_dir_all(&dir).unwrap();
+    // The shape the statusline shim writes.
+    std::fs::write(
+        dir.join("quota.json"),
+        format!(r#"{{"at":1786422487.5,"rate_limits":{{"five_hour":{{"used_percentage":{five_hour_pct}}}}}}}"#),
+    )
+    .unwrap();
+}
+
+/// Two divisions, two homes, and deliberately the same pid, the same
+/// `sessionId` and the same `pidDomain` in both - which is what happens when
+/// one machine watches two account trees. Without the account in the identity
+/// these collapse into one row and cross-fire each other's notifications.
+#[test]
+fn two_accounts_never_merge() {
+    let marketing = temp_home("acct-marketing");
+    let engineering = temp_home("acct-engineering");
+    let pid = std::process::id();
+    let start = own_proc_start();
+
+    write_session(&marketing.join(".claude/sessions"), pid, &start, "busy", 1_000);
+    write_session(&engineering.join(".claude/sessions"), pid, &start, "waiting", 1_000);
+    write_quota(&marketing, 12.0);
+    write_quota(&engineering, 88.0);
+
+    let mut scanner = Scanner::for_accounts(vec![
+        Account {
+            label: "claude-rina".into(),
+            division: "marketing".into(),
+            home: marketing.clone(),
+        },
+        Account {
+            label: "claude-core".into(),
+            division: "engineering".into(),
+            home: engineering.clone(),
+        },
+    ]);
+    let snap = scanner.tick();
+
+    assert_eq!(snap.accounts.len(), 2);
+    assert_eq!(snap.sessions.len(), 2, "one row per account, not one merged row");
+    assert_ne!(snap.sessions[0].key, snap.sessions[1].key, "identity must differ");
+    assert_eq!(snap.sessions[0].key.account, "claude-rina");
+    assert_eq!(snap.sessions[1].key.account, "claude-core");
+
+    // Two subscriptions, two independent windows - never averaged, never
+    // attributed to whichever account was scanned last.
+    let pct = |label: &str| {
+        snap.quotas
+            .iter()
+            .find(|q| q.account == label)
+            .unwrap_or_else(|| panic!("no quota for {label}"))
+            .five_hour_pct
+    };
+    assert_eq!(pct("claude-rina"), Some(12.0));
+    assert_eq!(pct("claude-core"), Some(88.0));
+
+    let _ = std::fs::remove_dir_all(&marketing);
+    let _ = std::fs::remove_dir_all(&engineering);
 }
